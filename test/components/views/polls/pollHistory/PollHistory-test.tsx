@@ -17,7 +17,6 @@ limitations under the License.
 import React from "react";
 import { act, fireEvent, render } from "@testing-library/react";
 import { Filter, EventTimeline, Room, MatrixEvent, M_POLL_START } from "matrix-js-sdk/src/matrix";
-import { TooltipProvider } from "@vector-im/compound-web";
 
 import { PollHistory } from "../../../../../src/components/views/polls/pollHistory/PollHistory";
 import {
@@ -25,6 +24,7 @@ import {
     getMockClientWithEventEmitter,
     makePollEndEvent,
     makePollStartEvent,
+    mockClientMethodsRooms,
     mockClientMethodsUser,
     mockIntlDateTimeFormat,
     setupRoomWithPollEvents,
@@ -42,7 +42,7 @@ describe("<PollHistory />", () => {
     const roomId = "!room:domain.org";
     const mockClient = getMockClientWithEventEmitter({
         ...mockClientMethodsUser(userId),
-        getRoom: jest.fn(),
+        ...mockClientMethodsRooms([]),
         relations: jest.fn(),
         decryptEventIfNeeded: jest.fn(),
         getOrCreateFilter: jest.fn(),
@@ -68,9 +68,7 @@ describe("<PollHistory />", () => {
     const getComponent = () =>
         render(<PollHistory {...defaultProps} />, {
             wrapper: ({ children }) => (
-                <MatrixClientContext.Provider value={mockClient}>
-                    <TooltipProvider>{children}</TooltipProvider>
-                </MatrixClientContext.Provider>
+                <MatrixClientContext.Provider value={mockClient}>{children}</MatrixClientContext.Provider>
             ),
         });
 
@@ -120,7 +118,7 @@ describe("<PollHistory />", () => {
         expect(getByText("Loading polls")).toBeInTheDocument();
 
         // flush filter creation request
-        await flushPromises();
+        await act(flushPromises);
 
         expect(liveTimeline.getPaginationToken).toHaveBeenCalledWith(EventTimeline.BACKWARDS);
         expect(mockClient.paginateEventTimeline).toHaveBeenCalledWith(liveTimeline, { backwards: true });
@@ -150,7 +148,7 @@ describe("<PollHistory />", () => {
         );
 
         // flush filter creation request
-        await flushPromises();
+        await act(flushPromises);
         // once per page
         expect(mockClient.paginateEventTimeline).toHaveBeenCalledTimes(3);
 
@@ -185,7 +183,7 @@ describe("<PollHistory />", () => {
 
     it("renders a no polls message when there are no active polls in the room", async () => {
         const { getByText } = getComponent();
-        await flushPromises();
+        await act(flushPromises);
 
         expect(getByText("There are no active polls in this room")).toBeTruthy();
     });
@@ -323,7 +321,7 @@ describe("<PollHistory />", () => {
 
             fireEvent.click(getByText("Question?"));
 
-            expect(queryByText("Poll history")).not.toBeInTheDocument();
+            expect(queryByText("Polls")).not.toBeInTheDocument();
             // elements from MPollBody
             expect(getByText("Question?")).toMatchSnapshot();
             expect(getByText("Socks")).toBeInTheDocument();
@@ -399,13 +397,13 @@ describe("<PollHistory />", () => {
             expect(getByText("Question?")).toBeInTheDocument();
 
             // header not shown
-            expect(queryByText("Poll history")).not.toBeInTheDocument();
+            expect(queryByText("Polls")).not.toBeInTheDocument();
 
             expect(getByText("Active polls")).toMatchSnapshot();
             fireEvent.click(getByText("Active polls"));
 
             // main list header displayed again
-            expect(getByText("Poll history")).toBeInTheDocument();
+            expect(getByText("Polls")).toBeInTheDocument();
             // active filter still active
             expect(getByTestId("filter-tab-PollHistory_filter-ACTIVE").firstElementChild).toBeChecked();
             // list displayed

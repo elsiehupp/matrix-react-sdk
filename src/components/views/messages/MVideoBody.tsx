@@ -16,6 +16,7 @@ limitations under the License.
 
 import React, { ReactNode } from "react";
 import { decode } from "blurhash";
+import { MediaEventContent } from "matrix-js-sdk/src/types";
 import { logger } from "matrix-js-sdk/src/logger";
 
 import { _t } from "../../../languageHandler";
@@ -23,7 +24,6 @@ import SettingsStore from "../../../settings/SettingsStore";
 import InlineSpinner from "../elements/InlineSpinner";
 import { mediaFromContent } from "../../../customisations/Media";
 import { BLURHASH_FIELD } from "../../../utils/image-media";
-import { IMediaEventContent } from "../../../customisations/models/IMediaEventContent";
 import { IBodyProps } from "./IBodyProps";
 import MFileBody from "./MFileBody";
 import { ImageSize, suggestedSize as suggestedVideoSize } from "../../../settings/enums/ImageSize";
@@ -42,27 +42,23 @@ interface IState {
 
 export default class MVideoBody extends React.PureComponent<IBodyProps, IState> {
     public static contextType = RoomContext;
-    public context!: React.ContextType<typeof RoomContext>;
+    public declare context: React.ContextType<typeof RoomContext>;
 
     private videoRef = React.createRef<HTMLVideoElement>();
     private sizeWatcher?: string;
 
-    public constructor(props: IBodyProps) {
-        super(props);
-
-        this.state = {
-            fetchingData: false,
-            decryptedUrl: null,
-            decryptedThumbnailUrl: null,
-            decryptedBlob: null,
-            error: null,
-            posterLoading: false,
-            blurhashUrl: null,
-        };
-    }
+    public state = {
+        fetchingData: false,
+        decryptedUrl: null,
+        decryptedThumbnailUrl: null,
+        decryptedBlob: null,
+        error: null,
+        posterLoading: false,
+        blurhashUrl: null,
+    };
 
     private getContentUrl(): string | undefined {
-        const content = this.props.mxEvent.getContent<IMediaEventContent>();
+        const content = this.props.mxEvent.getContent<MediaEventContent>();
         // During export, the content url will point to the MSC, which will later point to a local url
         if (this.props.forExport) return content.file?.url ?? content.url;
         const media = mediaFromContent(content);
@@ -82,7 +78,7 @@ export default class MVideoBody extends React.PureComponent<IBodyProps, IState> 
         // there's no need of thumbnail when the content is local
         if (this.props.forExport) return null;
 
-        const content = this.props.mxEvent.getContent<IMediaEventContent>();
+        const content = this.props.mxEvent.getContent<MediaEventContent>();
         const media = mediaFromContent(content);
 
         if (media.isEncrypted && this.state.decryptedThumbnailUrl) {
@@ -121,7 +117,7 @@ export default class MVideoBody extends React.PureComponent<IBodyProps, IState> 
             posterLoading: true,
         });
 
-        const content = this.props.mxEvent.getContent<IMediaEventContent>();
+        const content = this.props.mxEvent.getContent<MediaEventContent>();
         const media = mediaFromContent(content);
         if (media.hasThumbnail) {
             const image = new Image();
@@ -157,7 +153,7 @@ export default class MVideoBody extends React.PureComponent<IBodyProps, IState> 
                     this.props.onHeightChanged?.();
                 } else {
                     logger.log("NOT preloading video");
-                    const content = this.props.mxEvent.getContent<IMediaEventContent>();
+                    const content = this.props.mxEvent.getContent<MediaEventContent>();
 
                     let mimetype = content?.info?.mimetype;
 

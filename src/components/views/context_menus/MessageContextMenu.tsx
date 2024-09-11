@@ -36,9 +36,8 @@ import Modal from "../../../Modal";
 import Resend from "../../../Resend";
 import SettingsStore from "../../../settings/SettingsStore";
 import { isUrlPermitted } from "../../../HtmlUtils";
-import { canEditContent, canPinEvent, editEvent, isContentActionable } from "../../../utils/EventUtils";
+import { canEditContent, editEvent, isContentActionable } from "../../../utils/EventUtils";
 import IconizedContextMenu, { IconizedContextMenuOption, IconizedContextMenuOptionList } from "./IconizedContextMenu";
-import { ReadPinsEventId } from "../right_panel/types";
 import { Action } from "../../../dispatcher/actions";
 import { RoomPermalinkCreator } from "../../../utils/permalinks/Permalinks";
 import { ButtonEvent } from "../elements/AccessibleButton";
@@ -60,6 +59,8 @@ import { getForwardableEvent } from "../../../events/forward/getForwardableEvent
 import { getShareableLocationEvent } from "../../../events/location/getShareableLocationEvent";
 import { ShowThreadPayload } from "../../../dispatcher/payloads/ShowThreadPayload";
 import { CardContext } from "../right_panel/context";
+import PinningUtils from "../../../utils/PinningUtils";
+import PosthogTrackers from "../../../PosthogTrackers.ts";
 
 interface IReplyInThreadButton {
     mxEvent: MatrixEvent;
@@ -133,12 +134,12 @@ interface IState {
 
 export default class MessageContextMenu extends React.Component<IProps, IState> {
     public static contextType = RoomContext;
-    public context!: React.ContextType<typeof RoomContext>;
+    public declare context: React.ContextType<typeof RoomContext>;
 
     private reactButtonRef = createRef<any>(); // XXX Ref to a functional component
 
-    public constructor(props: IProps) {
-        super(props);
+    public constructor(props: IProps, context: React.ContextType<typeof RoomContext>) {
+        super(props, context);
 
         this.state = {
             canRedact: false,
@@ -177,23 +178,10 @@ export default class MessageContextMenu extends React.Component<IProps, IState> 
             this.props.mxEvent.getType() !== EventType.RoomServerAcl &&
             this.props.mxEvent.getType() !== EventType.RoomEncryption;
 
-        let canPin =
-            !!room?.currentState.mayClientSendStateEvent(EventType.RoomPinnedEvents, cli) &&
-            canPinEvent(this.props.mxEvent);
-
-        // HACK: Intentionally say we can't pin if the user doesn't want to use the functionality
-        if (!SettingsStore.getValue("feature_pinning")) canPin = false;
+        const canPin = PinningUtils.canPin(cli, this.props.mxEvent) || PinningUtils.canUnpin(cli, this.props.mxEvent);
 
         this.setState({ canRedact, canPin });
     };
-
-    private isPinned(): boolean {
-        const room = MatrixClientPeg.safeGet().getRoom(this.props.mxEvent.getRoomId());
-        const pinnedEvent = room?.currentState.getStateEvents(EventType.RoomPinnedEvents, "");
-        if (!pinnedEvent) return false;
-        const content = pinnedEvent.getContent();
-        return content.pinned && Array.isArray(content.pinned) && content.pinned.includes(this.props.mxEvent.getId());
-    }
 
     private canEndPoll(mxEvent: MatrixEvent): boolean {
         return (
@@ -256,23 +244,11 @@ export default class MessageContextMenu extends React.Component<IProps, IState> 
         this.closeMenu();
     };
 
-    private onPinClick = (): void => {
-        const cli = MatrixClientPeg.safeGet();
-        const room = cli.getRoom(this.props.mxEvent.getRoomId());
-        if (!room) return;
-        const eventId = this.props.mxEvent.getId();
+    private onPinClick = (isPinned: boolean): void => {
+        // Pin or unpin in background
+        PinningUtils.pinOrUnpinEvent(MatrixClientPeg.safeGet(), this.props.mxEvent);
+        PosthogTrackers.trackPinUnpinMessage(isPinned ? "Pin" : "Unpin", "Timeline");
 
-        const pinnedIds = room.currentState?.getStateEvents(EventType.RoomPinnedEvents, "")?.getContent().pinned || [];
-
-        if (pinnedIds.includes(eventId)) {
-            pinnedIds.splice(pinnedIds.indexOf(eventId), 1);
-        } else {
-            pinnedIds.push(eventId);
-            cli.setRoomAccountData(room.roomId, ReadPinsEventId, {
-                event_ids: [...(room.getAccountData(ReadPinsEventId)?.getContent()?.event_ids || []), eventId],
-            });
-        }
-        cli.sendStateEvent(room.roomId, EventType.RoomPinnedEvents, { pinned: pinnedIds }, "");
         this.closeMenu();
     };
 
@@ -448,17 +424,6 @@ export default class MessageContextMenu extends React.Component<IProps, IState> 
                     iconClassName="mx_MessageContextMenu_iconForward"
                     label={_t("action|forward")}
                     onClick={this.onForwardClick(forwardableEvent)}
-                />
-            );
-        }
-
-        let pinButton: JSX.Element | undefined;
-        if (contentActionable && this.state.canPin) {
-            pinButton = (
-                <IconizedContextMenuOption
-                    iconClassName="mx_MessageContextMenu_iconPin"
-                    label={this.isPinned() ? _t("action|unpin") : _t("action|pin")}
-                    onClick={this.onPinClick}
                 />
             );
         }
@@ -649,6 +614,18 @@ export default class MessageContextMenu extends React.Component<IProps, IState> 
             );
         }
 
+        let pinButton: JSX.Element | undefined;
+        if (rightClick && this.state.canPin) {
+            const isPinned = PinningUtils.isPinned(MatrixClientPeg.safeGet(), this.props.mxEvent);
+            pinButton = (
+                <IconizedContextMenuOption
+                    iconClassName={isPinned ? "mx_MessageContextMenu_iconUnpin" : "mx_MessageContextMenu_iconPin"}
+                    label={isPinned ? _t("action|unpin") : _t("action|pin")}
+                    onClick={() => this.onPinClick(isPinned)}
+                />
+            );
+        }
+
         let viewInRoomButton: JSX.Element | undefined;
         if (isThreadRootEvent) {
             viewInRoomButton = (
@@ -671,13 +648,14 @@ export default class MessageContextMenu extends React.Component<IProps, IState> 
         }
 
         let quickItemsList: JSX.Element | undefined;
-        if (editButton || replyButton || reactButton) {
+        if (editButton || replyButton || reactButton || pinButton) {
             quickItemsList = (
                 <IconizedContextMenuOptionList>
                     {reactButton}
                     {replyButton}
                     {replyInThreadButton}
                     {editButton}
+                    {pinButton}
                 </IconizedContextMenuOptionList>
             );
         }
@@ -688,7 +666,6 @@ export default class MessageContextMenu extends React.Component<IProps, IState> 
                 {openInMapSiteButton}
                 {endPollButton}
                 {forwardButton}
-                {pinButton}
                 {permalinkButton}
                 {reportEventButton}
                 {externalURLButton}

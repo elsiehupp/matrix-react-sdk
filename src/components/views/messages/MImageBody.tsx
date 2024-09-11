@@ -20,7 +20,8 @@ import { Blurhash } from "react-blurhash";
 import classNames from "classnames";
 import { CSSTransition, SwitchTransition } from "react-transition-group";
 import { logger } from "matrix-js-sdk/src/logger";
-import { ClientEvent, ClientEventHandlerMap } from "matrix-js-sdk/src/matrix";
+import { ClientEvent } from "matrix-js-sdk/src/matrix";
+import { ImageContent } from "matrix-js-sdk/src/types";
 import { Tooltip } from "@vector-im/compound-web";
 
 import MFileBody from "./MFileBody";
@@ -30,7 +31,6 @@ import SettingsStore from "../../../settings/SettingsStore";
 import Spinner from "../elements/Spinner";
 import { Media, mediaFromContent } from "../../../customisations/Media";
 import { BLURHASH_FIELD, createThumbnail } from "../../../utils/image-media";
-import { ImageContent } from "../../../customisations/models/IMediaEventContent";
 import ImageView from "../elements/ImageView";
 import { IBodyProps } from "./IBodyProps";
 import { ImageSize, suggestedSize as suggestedImageSize } from "../../../settings/enums/ImageSize";
@@ -65,29 +65,22 @@ interface IState {
 
 export default class MImageBody extends React.Component<IBodyProps, IState> {
     public static contextType = RoomContext;
-    public context!: React.ContextType<typeof RoomContext>;
+    public declare context: React.ContextType<typeof RoomContext>;
 
     private unmounted = true;
     private image = createRef<HTMLImageElement>();
     private timeout?: number;
     private sizeWatcher?: string;
-    private reconnectedListener: ClientEventHandlerMap[ClientEvent.Sync];
 
-    public constructor(props: IBodyProps) {
-        super(props);
-
-        this.reconnectedListener = createReconnectedListener(this.clearError);
-
-        this.state = {
-            contentUrl: null,
-            thumbUrl: null,
-            imgError: false,
-            imgLoaded: false,
-            hover: false,
-            showImage: SettingsStore.getValue("showImages"),
-            placeholder: Placeholder.NoImage,
-        };
-    }
+    public state: IState = {
+        contentUrl: null,
+        thumbUrl: null,
+        imgError: false,
+        imgLoaded: false,
+        hover: false,
+        showImage: SettingsStore.getValue("showImages"),
+        placeholder: Placeholder.NoImage,
+    };
 
     protected showImage(): void {
         localStorage.setItem("mx_ShowImage_" + this.props.mxEvent.getId(), "true");
@@ -160,10 +153,10 @@ export default class MImageBody extends React.Component<IBodyProps, IState> {
         imgElement.src = url;
     };
 
-    private clearError = (): void => {
+    private reconnectedListener = createReconnectedListener((): void => {
         MatrixClientPeg.get()?.off(ClientEvent.Sync, this.reconnectedListener);
         this.setState({ imgError: false });
-    };
+    });
 
     private onImageError = (): void => {
         // If the thumbnail failed to load then try again using the contentUrl

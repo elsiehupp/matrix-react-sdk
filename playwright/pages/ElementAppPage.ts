@@ -21,12 +21,29 @@ import { Client } from "./client";
 import { Timeline } from "./timeline";
 import { Spotlight } from "./Spotlight";
 
+/**
+ * A set of utility methods for interacting with the Element-Web UI.
+ */
 export class ElementAppPage {
     public constructor(public readonly page: Page) {}
 
-    public settings = new Settings(this.page);
-    public client: Client = new Client(this.page);
-    public timeline: Timeline = new Timeline(this.page);
+    // We create these lazily on first access to avoid calling setup code which might cause conflicts,
+    // e.g. the network routing code in the client subfixture.
+    private _settings?: Settings;
+    public get settings(): Settings {
+        if (!this._settings) this._settings = new Settings(this.page);
+        return this._settings;
+    }
+    private _client?: Client;
+    public get client(): Client {
+        if (!this._client) this._client = new Client(this.page);
+        return this._client;
+    }
+    private _timeline?: Timeline;
+    public get timeline(): Timeline {
+        if (!this._timeline) this._timeline = new Timeline(this.page);
+        return this._timeline;
+    }
 
     /**
      * Open the top left user menu, returning a Locator to the resulting context menu.
@@ -153,5 +170,14 @@ export class ElementAppPage {
         const spotlight = new Spotlight(this.page);
         await spotlight.open();
         return spotlight;
+    }
+
+    /**
+     * Opens/closes the room info panel
+     * @returns locator to the right panel
+     */
+    public async toggleRoomInfoPanel(): Promise<Locator> {
+        await this.page.getByRole("button", { name: "Room info" }).first().click();
+        return this.page.locator(".mx_RightPanel");
     }
 }

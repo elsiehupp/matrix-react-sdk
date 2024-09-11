@@ -252,7 +252,8 @@ test.describe("Threads", () => {
         await expect(locator.locator(".mx_ThreadSummary_content").getByText("How are things?")).toBeAttached();
 
         locator = page.getByRole("button", { name: "Threads" });
-        await expect(locator).toHaveClass(/mx_LegacyRoomHeader_button--unread/); // User asserts thread list unread indicator
+        await expect(locator).toHaveAttribute("data-indicator", "default"); // User asserts thread list unread indicator
+        // await expect(locator).toHaveClass(/mx_LegacyRoomHeader_button--unread/);
         await locator.click(); // User opens thread list
 
         // User asserts thread with correct root & latest events & unread dot
@@ -433,7 +434,7 @@ test.describe("Threads", () => {
         await textbox.press("Enter");
         await expect(locator.locator(".mx_EventTile_last").getByText("Hello Mr. User")).toBeAttached();
         // Close thread
-        await locator.getByRole("button", { name: "Close" }).click();
+        await locator.getByTestId("base-card-close-button").click();
 
         // Open existing thread
         locator = page
@@ -446,5 +447,71 @@ test.describe("Threads", () => {
         locator = page.locator(".mx_BaseCard");
         await expect(locator.locator(".mx_EventTile").first().getByText("Hello Mr. Bot")).toBeAttached();
         await expect(locator.locator(".mx_EventTile").last().getByText("Hello Mr. User")).toBeAttached();
+    });
+
+    test("navigate through right panel", async ({ page, app, user }) => {
+        // Create room
+        const roomId = await app.client.createRoom({});
+        await page.goto("/#/room/" + roomId);
+
+        /**
+         * Send a message in the main timeline
+         * @param message
+         */
+        const sendMessage = async (message: string) => {
+            const messageComposer = page.getByRole("region", { name: "Message composer" });
+            const textbox = messageComposer.getByRole("textbox", { name: "Send a message…" });
+            await textbox.fill(message);
+            await textbox.press("Enter");
+        };
+
+        /**
+         * Create a thread from the rootMessage and send a message in the thread
+         * @param rootMessage
+         * @param threadMessage
+         */
+        const createThread = async (rootMessage: string, threadMessage: string) => {
+            // First create a thread
+            const roomViewBody = page.locator(".mx_RoomView_body");
+            const messageTile = roomViewBody
+                .locator(".mx_EventTile[data-scroll-tokens]")
+                .filter({ hasText: rootMessage });
+            await messageTile.hover();
+            await messageTile.getByRole("button", { name: "Reply in thread" }).click();
+            await expect(page.locator(".mx_ThreadView_timelinePanelWrapper")).toHaveCount(1);
+
+            // Send a message in the thread
+            const threadPanel = page.locator(".mx_ThreadPanel");
+            const textbox = threadPanel.getByRole("textbox", { name: "Send a message…" });
+            await textbox.fill(threadMessage);
+            await textbox.press("Enter");
+            await expect(threadPanel.locator(".mx_EventTile_last").getByText(threadMessage)).toBeVisible();
+            // Close thread
+            await threadPanel.getByTestId("base-card-close-button").click();
+        };
+
+        await sendMessage("Hello Mr. Bot");
+        await sendMessage("Hello again Mr. Bot");
+        await createThread("Hello Mr. Bot", "Hello Mr. User in a thread");
+        await createThread("Hello again Mr. Bot", "Hello again Mr. User in a thread");
+
+        // Open thread panel
+        await page.locator(".mx_RoomHeader").getByRole("button", { name: "Threads" }).click();
+        const threadPanel = page.locator(".mx_ThreadPanel");
+        await expect(
+            threadPanel.locator(".mx_EventTile_last").getByText("Hello again Mr. User in a thread"),
+        ).toBeVisible();
+
+        const rightPanel = page.locator(".mx_RightPanel");
+        // Check that the threads are listed
+        await expect(rightPanel.locator(".mx_EventTile").getByText("Hello Mr. User in a thread")).toBeVisible();
+        await expect(rightPanel.locator(".mx_EventTile").getByText("Hello again Mr. User in a thread")).toBeVisible();
+
+        // Open the first thread
+        await rightPanel.locator(".mx_EventTile").getByText("Hello Mr. User in a thread").click();
+        await expect(rightPanel.locator(".mx_EventTile").getByText("Hello Mr. User in a thread")).toBeVisible();
+        await expect(
+            rightPanel.locator(".mx_EventTile").getByText("Hello again Mr. User in a thread"),
+        ).not.toBeVisible();
     });
 });

@@ -30,7 +30,6 @@ import { Signup } from "@matrix-org/analytics-events/types/typescript/Signup";
 import PlatformPeg from "../../../PlatformPeg";
 import AccessibleButton from "./AccessibleButton";
 import { _t } from "../../../languageHandler";
-import AccessibleTooltipButton from "./AccessibleTooltipButton";
 import { mediaFromMxc } from "../../../customisations/Media";
 import { PosthogAnalytics } from "../../../PosthogAnalytics";
 
@@ -131,9 +130,9 @@ const SSOButton: React.FC<ISSOButtonProps> = ({
     if (mini) {
         // TODO fallback icon
         return (
-            <AccessibleTooltipButton {...props} title={label} className={classes} onClick={onClick}>
+            <AccessibleButton {...props} title={label} className={classes} onClick={onClick}>
                 {icon}
-            </AccessibleTooltipButton>
+            </AccessibleButton>
         );
     }
 
@@ -152,11 +151,20 @@ interface IProps {
     fragmentAfterLogin?: string;
     primary?: boolean;
     action?: SSOAction;
+    disabled?: boolean;
 }
 
 const MAX_PER_ROW = 6;
 
-const SSOButtons: React.FC<IProps> = ({ matrixClient, flow, loginType, fragmentAfterLogin, primary, action }) => {
+const SSOButtons: React.FC<IProps> = ({
+    matrixClient,
+    flow,
+    loginType,
+    fragmentAfterLogin,
+    primary,
+    action,
+    disabled,
+}) => {
     const providers = flow.identity_providers || [];
     if (providers.length < 2) {
         return (
@@ -169,6 +177,7 @@ const SSOButtons: React.FC<IProps> = ({ matrixClient, flow, loginType, fragmentA
                     primary={primary}
                     action={action}
                     flow={flow}
+                    disabled={disabled}
                 />
             </div>
         );

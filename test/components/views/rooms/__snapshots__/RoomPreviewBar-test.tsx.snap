@@ -23,8 +23,8 @@ exports[`<RoomPreviewBar /> message case AskToJoin renders the corresponding mes
   </h3>
   <p>
     <span
-      class="_avatar_1o69u_17 mx_BaseAvatar _avatar-imageless_1o69u_60"
-      data-color="4"
+      class="_avatar_mcap2_17 mx_BaseAvatar _avatar-imageless_mcap2_61"
+      data-color="6"
       data-testid="avatar-img"
       data-type="round"
       role="presentation"
@@ -48,8 +48,8 @@ exports[`<RoomPreviewBar /> message case AskToJoin renders the corresponding mes
   </h3>
   <p>
     <span
-      class="_avatar_1o69u_17 mx_BaseAvatar _avatar-imageless_1o69u_60"
-      data-color="4"
+      class="_avatar_mcap2_17 mx_BaseAvatar _avatar-imageless_mcap2_61"
+      data-color="6"
       data-testid="avatar-img"
       data-type="round"
       role="presentation"
@@ -73,7 +73,7 @@ exports[`<RoomPreviewBar /> message case AskToJoin renders the corresponding mes
   </h3>
   <p>
     <span
-      class="_avatar_1o69u_17 mx_BaseAvatar _avatar-imageless_1o69u_60"
+      class="_avatar_mcap2_17 mx_BaseAvatar _avatar-imageless_mcap2_61"
       data-color="1"
       data-testid="avatar-img"
       data-type="round"
@@ -252,8 +252,8 @@ exports[`<RoomPreviewBar /> with an invite with an invited email when client has
   </h3>
   <p>
     <span
-      class="_avatar_1o69u_17 mx_BaseAvatar _avatar-imageless_1o69u_60"
-      data-color="4"
+      class="_avatar_mcap2_17 mx_BaseAvatar _avatar-imageless_mcap2_61"
+      data-color="6"
       data-testid="avatar-img"
       data-type="round"
       role="presentation"
@@ -264,12 +264,12 @@ exports[`<RoomPreviewBar /> with an invite with an invited email when client has
   </p>
   <p>
     <span>
+      Invited by 
       <span
         class="mx_RoomPreviewBar_inviter"
       >
         @inviter:test.com
       </span>
-       invited you
     </span>
   </p>
 </div>
@@ -310,8 +310,8 @@ exports[`<RoomPreviewBar /> with an invite without an invited email for a dm roo
   </h3>
   <p>
     <span
-      class="_avatar_1o69u_17 mx_BaseAvatar _avatar-imageless_1o69u_60"
-      data-color="4"
+      class="_avatar_mcap2_17 mx_BaseAvatar _avatar-imageless_mcap2_61"
+      data-color="6"
       data-testid="avatar-img"
       data-type="round"
       role="presentation"
@@ -322,17 +322,18 @@ exports[`<RoomPreviewBar /> with an invite without an invited email for a dm roo
   </p>
   <p>
     <span>
-      <span>
-        <span
-          class="mx_RoomPreviewBar_inviter"
-        >
-          @inviter:test.com name
-        </span>
-         (
-        @inviter:test.com
-        )
+      <span
+        class="mx_RoomPreviewBar_inviter"
+      >
+        @inviter:test.com name
       </span>
        wants to chat
+    </span>
+    <br />
+    <span
+      class="mx_RoomPreviewBar_inviter_mxid"
+    >
+      @inviter:test.com
     </span>
   </p>
 </div>
@@ -375,8 +376,8 @@ exports[`<RoomPreviewBar /> with an invite without an invited email for a non-dm
   </h3>
   <p>
     <span
-      class="_avatar_1o69u_17 mx_BaseAvatar _avatar-imageless_1o69u_60"
-      data-color="4"
+      class="_avatar_mcap2_17 mx_BaseAvatar _avatar-imageless_mcap2_61"
+      data-color="6"
       data-testid="avatar-img"
       data-type="round"
       role="presentation"
@@ -387,17 +388,18 @@ exports[`<RoomPreviewBar /> with an invite without an invited email for a non-dm
   </p>
   <p>
     <span>
-      <span>
-        <span
-          class="mx_RoomPreviewBar_inviter"
-        >
-          @inviter:test.com name
-        </span>
-         (
-        @inviter:test.com
-        )
+      Invited by 
+      <span
+        class="mx_RoomPreviewBar_inviter"
+      >
+        @inviter:test.com name
       </span>
-       invited you
+    </span>
+    <br />
+    <span
+      class="mx_RoomPreviewBar_inviter_mxid"
+    >
+      @inviter:test.com
     </span>
   </p>
 </div>

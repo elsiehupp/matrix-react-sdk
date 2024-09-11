@@ -16,6 +16,7 @@ limitations under the License.
 
 import React, { AllHTMLAttributes, createRef } from "react";
 import { logger } from "matrix-js-sdk/src/logger";
+import { MediaEventContent } from "matrix-js-sdk/src/types";
 
 import { _t } from "../../../languageHandler";
 import Modal from "../../../Modal";
@@ -23,7 +24,6 @@ import AccessibleButton from "../elements/AccessibleButton";
 import { mediaFromContent } from "../../../customisations/Media";
 import ErrorDialog from "../dialogs/ErrorDialog";
 import { fileSize, presentableTextForFile } from "../../../utils/FileUtils";
-import { IMediaEventContent } from "../../../customisations/models/IMediaEventContent";
 import { IBodyProps } from "./IBodyProps";
 import { FileDownloader } from "../../../utils/FileDownloader";
 import TextWithTooltip from "../elements/TextWithTooltip";
@@ -106,7 +106,9 @@ interface IState {
 
 export default class MFileBody extends React.Component<IProps, IState> {
     public static contextType = RoomContext;
-    public context!: React.ContextType<typeof RoomContext>;
+    public declare context: React.ContextType<typeof RoomContext>;
+
+    public state: IState = {};
 
     public static defaultProps = {
         showGenericPlaceholder: true,
@@ -117,19 +119,13 @@ export default class MFileBody extends React.Component<IProps, IState> {
     private userDidClick = false;
     private fileDownloader: FileDownloader = new FileDownloader(() => this.iframe.current);
 
-    public constructor(props: IProps) {
-        super(props);
-
-        this.state = {};
-    }
-
     private getContentUrl(): string | null {
         if (this.props.forExport) return null;
         const media = mediaFromContent(this.props.mxEvent.getContent());
         return media.srcHttp;
     }
-    private get content(): IMediaEventContent {
-        return this.props.mxEvent.getContent<IMediaEventContent>();
+    private get content(): MediaEventContent {
+        return this.props.mxEvent.getContent<MediaEventContent>();
     }
 
     private get fileName(): string {
@@ -288,7 +284,7 @@ export default class MFileBody extends React.Component<IProps, IState> {
                                 src={url}
                                 onLoad={() => this.downloadFile(this.fileName, this.linkText)}
                                 ref={this.iframe}
-                                sandbox="allow-scripts allow-downloads allow-downloads-without-user-activation"
+                                sandbox="allow-scripts allow-downloads"
                             />
                         </div>
                     )}

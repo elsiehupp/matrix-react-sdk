@@ -38,12 +38,12 @@ export class MockedCall extends Call {
                 url: "https://example.org",
                 name: "Group call",
                 creatorUserId: "@alice:example.org",
-                // waitForIframeLoad = false, makes the widget API wait for the 'contentLoaded' event instead.
-                // This is how the EC is designed, but for backwards compatibility (full mesh) we currently need to use waitForIframeLoad = true
-                // waitForIframeLoad: false
+                // waitForIframeLoad = false, makes the widget API wait for the 'contentLoaded' event.
+                waitForIframeLoad: false,
             },
             room.client,
         );
+        this.groupCall = { creationTs: this.event.getTs() } as unknown as GroupCall;
     }
 
     public static get(room: Room): MockedCall | null {
@@ -68,7 +68,7 @@ export class MockedCall extends Call {
         CallStore.instance.updateRoom(room);
     }
 
-    public readonly groupCall = { creationTs: this.event.getTs() } as unknown as GroupCall;
+    public readonly groupCall: GroupCall;
 
     public get participants(): Map<RoomMember, Set<string>> {
         return super.participants;

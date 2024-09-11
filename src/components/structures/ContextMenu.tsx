@@ -20,7 +20,6 @@ import React, { CSSProperties, RefObject, SyntheticEvent, useRef, useState } fro
 import ReactDOM from "react-dom";
 import classNames from "classnames";
 import FocusLock from "react-focus-lock";
-import { TooltipProvider } from "@vector-im/compound-web";
 
 import { Writeable } from "../../@types/common";
 import UIStore from "../../stores/UIStore";
@@ -171,7 +170,7 @@ export default class ContextMenu extends React.PureComponent<React.PropsWithChil
 
             // XXX: This isn't pretty but the only way to allow opening a different context menu on right click whilst
             // a context menu and its click-guard are up without completely rewriting how the context menus work.
-            setImmediate(() => {
+            setTimeout(() => {
                 const clickEvent = new MouseEvent("contextmenu", {
                     clientX: x,
                     clientY: y,
@@ -181,7 +180,7 @@ export default class ContextMenu extends React.PureComponent<React.PropsWithChil
                     relatedTarget: null,
                 });
                 document.elementFromPoint(x, y)?.dispatchEvent(clickEvent);
-            });
+            }, 0);
         }
     };
 
@@ -630,17 +629,15 @@ export function createMenu(
     };
 
     const menu = (
-        <TooltipProvider>
-            <ContextMenu
-                {...props}
-                mountAsChild={true}
-                hasBackground={false}
-                onFinished={onFinished} // eslint-disable-line react/jsx-no-bind
-                windowResize={onFinished} // eslint-disable-line react/jsx-no-bind
-            >
-                <ElementClass {...props} onFinished={onFinished} />
-            </ContextMenu>
-        </TooltipProvider>
+        <ContextMenu
+            {...props}
+            mountAsChild={true}
+            hasBackground={false}
+            onFinished={onFinished} // eslint-disable-line react/jsx-no-bind
+            windowResize={onFinished} // eslint-disable-line react/jsx-no-bind
+        >
+            <ElementClass {...props} onFinished={onFinished} />
+        </ContextMenu>
     );
 
     ReactDOM.render(menu, getOrCreateContainer());

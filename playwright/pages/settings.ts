@@ -25,8 +25,9 @@ export class Settings {
      * Open the top left user menu, returning a Locator to the resulting context menu.
      */
     public async openUserMenu(): Promise<Locator> {
-        await this.page.getByRole("button", { name: "User menu" }).click();
         const locator = this.page.locator(".mx_ContextualMenu");
+        if (await locator.locator(".mx_UserMenu_contextMenu_header").isVisible()) return locator;
+        await this.page.getByRole("button", { name: "User menu" }).click();
         await locator.waitFor();
         return locator;
     }
@@ -90,12 +91,17 @@ export class Settings {
     }
 
     /**
-     * Open room settings (via room header menu), returns a locator to the dialog
+     * Open room settings (via room info panel), returns a locator to the dialog
      * @param tab the name of the tab to switch to after opening, optional.
      */
     public async openRoomSettings(tab?: string): Promise<Locator> {
-        await this.page.getByRole("banner").getByRole("button", { name: "Room options", exact: true }).click();
-        await this.page.locator(".mx_RoomTile_contextMenu").getByRole("menuitem", { name: "Settings" }).click();
+        // Open right panel if not open
+        const rightPanel = this.page.locator(".mx_RightPanel");
+        if ((await rightPanel.count()) === 0) {
+            await this.page.getByRole("button", { name: "Room info" }).first().click();
+        }
+        await rightPanel.getByRole("menuitem", { name: "Settings" }).click();
+
         if (tab) await this.switchTab(tab);
         return this.page.locator(".mx_Dialog").filter({ has: this.page.locator(".mx_RoomSettingsDialog") });
     }

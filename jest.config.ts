@@ -22,7 +22,7 @@ const config: Config = {
     testEnvironment: "jsdom",
     testMatch: ["<rootDir>/test/**/*-test.[jt]s?(x)"],
     globalSetup: "<rootDir>/test/globalSetup.ts",
-    setupFiles: ["jest-canvas-mock"],
+    setupFiles: ["jest-canvas-mock", "web-streams-polyfill/polyfill"],
     setupFilesAfterEnv: ["<rootDir>/test/setupTests.ts"],
     moduleNameMapper: {
         "\\.(gif|png|ttf|woff2)$": "<rootDir>/__mocks__/imageMock.js",
@@ -44,6 +44,7 @@ const config: Config = {
     ],
     coverageReporters: ["text-summary", "lcov"],
     testResultsProcessor: "@casualbot/jest-sonar-reporter",
+    prettierPath: null,
 };
 
 // if we're running under GHA, enable the GHA reporter
@@ -52,7 +53,7 @@ if (env["GITHUB_ACTIONS"] !== undefined) {
 
     // if we're running against the develop branch, also enable the slow test reporter
     if (env["GITHUB_REF"] == "refs/heads/develop") {
-        reporters.push("<rootDir>/test/slowReporter.js");
+        reporters.push("<rootDir>/test/slowReporter.cjs");
     }
     config.reporters = reporters;
 }

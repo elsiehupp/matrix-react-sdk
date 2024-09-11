@@ -15,6 +15,7 @@ limitations under the License.
 
 import { EventEmitter } from "events";
 import { Room, RoomMember, EventType, MatrixEvent } from "matrix-js-sdk/src/matrix";
+import { KnownMembership } from "matrix-js-sdk/src/types";
 
 import { MatrixClientPeg } from "../../../src/MatrixClientPeg";
 import { PermalinkParts } from "../../../src/utils/permalinks/PermalinkConstructor";
@@ -24,6 +25,8 @@ import {
     parsePermalink,
     RoomPermalinkCreator,
 } from "../../../src/utils/permalinks/Permalinks";
+import { IConfigOptions } from "../../../src/IConfigOptions";
+import SdkConfig from "../../../src/SdkConfig";
 import { getMockClientWithEventEmitter } from "../../test-utils";
 
 describe("Permalinks", function () {
@@ -45,7 +48,7 @@ describe("Permalinks", function () {
         members: RoomMember[],
         serverACLContent?: { deny?: string[]; allow?: string[] },
     ): Room {
-        members.forEach((m) => (m.membership = "join"));
+        members.forEach((m) => (m.membership = KnownMembership.Join));
         const powerLevelsUsers = members.reduce<Record<string, number>>((pl, member) => {
             if (Number.isFinite(member.powerLevel)) {
                 pl[member.userId] = member.powerLevel;
@@ -152,11 +155,11 @@ describe("Permalinks", function () {
         const creator = new RoomPermalinkCreator(room, null);
         creator.load();
         expect(creator.serverCandidates![0]).toBe("pl_95");
-        member95.membership = "left";
+        member95.membership = KnownMembership.Leave;
         // @ts-ignore illegal private property
         creator.onRoomStateUpdate();
         expect(creator.serverCandidates![0]).toBe("pl_75");
-        member95.membership = "join";
+        member95.membership = KnownMembership.Join;
         // @ts-ignore illegal private property
         creator.onRoomStateUpdate();
         expect(creator.serverCandidates![0]).toBe("pl_95");
@@ -388,6 +391,17 @@ describe("Permalinks", function () {
     it("should generate a user permalink", function () {
         const result = makeUserPermalink("@someone:example.org");
         expect(result).toBe("https://matrix.to/#/@someone:example.org");
+    });
+
+    it("should use permalink_prefix for permalinks", function () {
+        const sdkConfigGet = SdkConfig.get;
+        jest.spyOn(SdkConfig, "get").mockImplementation((key: keyof IConfigOptions, altCaseName?: string) => {
+            if (key === "permalink_prefix") {
+                return "https://element.fs.tld";
+            } else return sdkConfigGet(key, altCaseName);
+        });
+        const result = makeUserPermalink("@someone:example.org");
+        expect(result).toBe("https://element.fs.tld/#/user/@someone:example.org");
     });
 
     describe("parsePermalink", () => {

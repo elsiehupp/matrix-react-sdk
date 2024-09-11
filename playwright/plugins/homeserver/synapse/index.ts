@@ -25,6 +25,11 @@ import { Docker } from "../../docker";
 import { HomeserverConfig, HomeserverInstance, Homeserver, StartHomeserverOpts, Credentials } from "..";
 import { randB64Bytes } from "../../utils/rand";
 
+// Docker tag to use for synapse docker image.
+// We target a specific digest as every now and then a Synapse update will break our CI.
+// This digest is updated by the playwright-image-updates.yaml workflow periodically.
+const DOCKER_TAG = "develop@sha256:84e3d3a5ecbb618d29878e99fa58b6b926d6feb08ea536063cabed41be0a057c";
+
 async function cfgDirFromTemplate(opts: StartHomeserverOpts): Promise<Omit<HomeserverConfig, "dockerUrl">> {
     const templateDir = path.join(__dirname, "templates", opts.template);
 
@@ -57,20 +62,9 @@ async function cfgDirFromTemplate(opts: StartHomeserverOpts): Promise<Omit<Homes
     if (opts.oAuthServerPort) {
         hsYaml = hsYaml.replace(/{{OAUTH_SERVER_PORT}}/g, opts.oAuthServerPort.toString());
     }
-    hsYaml = hsYaml.replace(/{{HOST_DOCKER_INTERNAL}}/g, await Docker.hostnameOfHost());
     if (opts.variables) {
-        let fetchedHostContainer: Awaited<ReturnType<typeof Docker.hostnameOfHost>> | null = null;
         for (const key in opts.variables) {
-            let value = String(opts.variables[key]);
-
-            if (value === "{{HOST_DOCKER_INTERNAL}}") {
-                if (!fetchedHostContainer) {
-                    fetchedHostContainer = await Docker.hostnameOfHost();
-                }
-                value = fetchedHostContainer;
-            }
-
-            hsYaml = hsYaml.replace(new RegExp("%" + key + "%", "g"), value);
+            hsYaml = hsYaml.replace(new RegExp("%" + key + "%", "g"), String(opts.variables[key]));
         }
     }
 
@@ -100,34 +94,23 @@ export class Synapse implements Homeserver, HomeserverInstance {
     protected docker: Docker = new Docker();
     public config: HomeserverConfig & { serverId: string };
 
+    private adminToken?: string;
+
     public constructor(private readonly request: APIRequestContext) {}
 
     /**
      * Start a synapse instance: the template must be the name of
      * one of the templates in the playwright/plugins/synapsedocker/templates
      * directory.
-     *
-     * Any value in `opts.variables` that is set to `{{HOST_DOCKER_INTERNAL}}'
-     * will be replaced with 'host.docker.internal' (if we are on Docker) or
-     * 'host.containers.internal' if we are on Podman.
      */
     public async start(opts: StartHomeserverOpts): Promise<HomeserverInstance> {
         if (this.config) await this.stop();
 
         const synCfg = await cfgDirFromTemplate(opts);
         console.log(`Starting synapse with config dir ${synCfg.configDir}...`);
-        const dockerSynapseParams = ["--rm", "-v", `${synCfg.configDir}:/data`, "-p", `${synCfg.port}:8008/tcp`];
-        if (await Docker.isPodman()) {
-            // Make host.containers.internal work to allow Synapse to talk to the test OIDC server.
-            dockerSynapseParams.push("--network");
-            dockerSynapseParams.push("slirp4netns:allow_host_loopback=true");
-        } else {
-            // Make host.docker.internal work to allow Synapse to talk to the test OIDC server.
-            dockerSynapseParams.push("--add-host");
-            dockerSynapseParams.push("host.docker.internal:host-gateway");
-        }
+        const dockerSynapseParams = ["-v", `${synCfg.configDir}:/data`, "-p", `${synCfg.port}:8008/tcp`];
         const synapseId = await this.docker.run({
-            image: "matrixdotorg/synapse:develop",
+            image: `ghcr.io/element-hq/synapse:${DOCKER_TAG}`,
             containerName: `react-sdk-playwright-synapse`,
             params: dockerSynapseParams,
             cmd: ["run"],
@@ -158,7 +141,7 @@ export class Synapse implements Homeserver, HomeserverInstance {
     public async stop(): Promise<string[]> {
         if (!this.config) throw new Error("Missing existing synapse instance, did you call stop() before start()?");
         const id = this.config.serverId;
-        const synapseLogsPath = path.join("playwright", "synapselogs", id);
+        const synapseLogsPath = path.join("playwright", "logs", "synapse", id);
         await fse.ensureDir(synapseLogsPath);
         await this.docker.persistLogsToFile({
             stdoutFile: path.join(synapseLogsPath, "stdout.log"),
@@ -171,12 +154,17 @@ export class Synapse implements Homeserver, HomeserverInstance {
         return [path.join(synapseLogsPath, "stdout.log"), path.join(synapseLogsPath, "stderr.log")];
     }
 
-    public async registerUser(username: string, password: string, displayName?: string): Promise<Credentials> {
+    private async registerUserInternal(
+        username: string,
+        password: string,
+        displayName?: string,
+        admin = false,
+    ): Promise<Credentials> {
         const url = `${this.config.baseUrl}/_synapse/admin/v1/register`;
         const { nonce } = await this.request.get(url).then((r) => r.json());
         const mac = crypto
             .createHmac("sha1", this.config.registrationSecret)
-            .update(`${nonce}\0${username}\0${password}\0notadmin`)
+            .update(`${nonce}\0${username}\0${password}\0${admin ? "" : "not"}admin`)
             .digest("hex");
         const res = await this.request.post(url, {
             data: {
@@ -184,7 +172,7 @@ export class Synapse implements Homeserver, HomeserverInstance {
                 username,
                 password,
                 mac,
-                admin: false,
+                admin,
                 displayname: displayName,
             },
         });
@@ -202,6 +190,10 @@ export class Synapse implements Homeserver, HomeserverInstance {
             password,
             displayName,
         };
+    }
+
+    public registerUser(username: string, password: string, displayName?: string): Promise<Credentials> {
+        return this.registerUserInternal(username, password, displayName, false);
     }
 
     public async loginUser(userId: string, password: string): Promise<Credentials> {
@@ -225,5 +217,31 @@ export class Synapse implements Homeserver, HomeserverInstance {
             deviceId: json.device_id,
             homeServer: json.home_server,
         };
+    }
+
+    public async setThreepid(userId: string, medium: string, address: string): Promise<void> {
+        if (this.adminToken === undefined) {
+            const result = await this.registerUserInternal("admin", "totalyinsecureadminpassword", undefined, true);
+            this.adminToken = result.accessToken;
+        }
+
+        const url = `${this.config.baseUrl}/_synapse/admin/v2/users/${userId}`;
+        const res = await this.request.put(url, {
+            data: {
+                threepids: [
+                    {
+                        medium,
+                        address,
+                    },
+                ],
+            },
+            headers: {
+                Authorization: `Bearer ${this.adminToken}`,
+            },
+        });
+
+        if (!res.ok()) {
+            throw await res.json();
+        }
     }
 }

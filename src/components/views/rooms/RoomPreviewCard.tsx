@@ -16,6 +16,7 @@ limitations under the License.
 
 import React, { FC, useContext, useState } from "react";
 import { Room, JoinRule } from "matrix-js-sdk/src/matrix";
+import { KnownMembership } from "matrix-js-sdk/src/types";
 
 import { _t } from "../../../languageHandler";
 import defaultDispatcher from "../../../dispatcher/dispatcher";
@@ -36,6 +37,7 @@ import RoomAvatar from "../avatars/RoomAvatar";
 import MemberAvatar from "../avatars/MemberAvatar";
 import { BetaPill } from "../beta/BetaCard";
 import RoomInfoLine from "./RoomInfoLine";
+import { useIsVideoRoom } from "../../../utils/video-rooms";
 
 interface IProps {
     room: Room;
@@ -50,8 +52,7 @@ interface IProps {
 const RoomPreviewCard: FC<IProps> = ({ room, onJoinButtonClicked, onRejectButtonClicked }) => {
     const cli = useContext(MatrixClientContext);
     const videoRoomsEnabled = useFeatureEnabled("feature_video_rooms");
-    const elementCallVideoRoomsEnabled = useFeatureEnabled("feature_element_call_video_rooms");
-    const isVideoRoom = room.isElementVideoRoom() || (elementCallVideoRoomsEnabled && room.isCallRoom());
+    const isVideoRoom = useIsVideoRoom(room, true);
     const myMembership = useMyRoomMembership(room);
     useDispatcher(defaultDispatcher, (payload) => {
         if (payload.action === Action.JoinRoomError && payload.roomId === room.roomId) {
@@ -73,7 +74,7 @@ const RoomPreviewCard: FC<IProps> = ({ room, onJoinButtonClicked, onRejectButton
 
     let inviterSection: JSX.Element | null = null;
     let joinButtons: JSX.Element;
-    if (myMembership === "join") {
+    if (myMembership === KnownMembership.Join) {
         joinButtons = (
             <AccessibleButton
                 kind="danger_outline"
@@ -87,7 +88,7 @@ const RoomPreviewCard: FC<IProps> = ({ room, onJoinButtonClicked, onRejectButton
                 {_t("action|leave")}
             </AccessibleButton>
         );
-    } else if (myMembership === "invite") {
+    } else if (myMembership === KnownMembership.Invite) {
         const inviteSender = room.getMember(cli.getUserId()!)?.events.member?.getSender();
 
         if (inviteSender) {
@@ -178,7 +179,7 @@ const RoomPreviewCard: FC<IProps> = ({ room, onJoinButtonClicked, onRejectButton
         });
     } else if (isVideoRoom && !videoRoomsEnabled) {
         notice =
-            myMembership === "join"
+            myMembership === KnownMembership.Join
                 ? _t("room|view_failed_enable_video_rooms")
                 : _t("room|join_failed_enable_video_rooms");
 

@@ -21,7 +21,8 @@ import SetupEncryptionDialog from "../components/views/dialogs/security/SetupEnc
 import { accessSecretStorage } from "../SecurityManager";
 import ToastStore from "../stores/ToastStore";
 import GenericToast from "../components/views/toasts/GenericToast";
-import SecurityCustomisations from "../customisations/Security";
+import { ModuleRunner } from "../modules/ModuleRunner";
+import { SetupEncryptionStore } from "../stores/SetupEncryptionStore";
 import Spinner from "../components/views/elements/Spinner";
 
 const TOAST_KEY = "setupencryption";
@@ -79,7 +80,12 @@ const onReject = (): void => {
 };
 
 export const showToast = (kind: Kind): void => {
-    if (SecurityCustomisations.setupEncryptionNeeded?.(kind)) {
+    if (
+        ModuleRunner.instance.extensions.cryptoSetup.setupEncryptionNeeded({
+            kind: kind as any,
+            storeProvider: { getInstance: () => SetupEncryptionStore.sharedInstance() },
+        })
+    ) {
         return;
     }
 
@@ -108,10 +114,11 @@ export const showToast = (kind: Kind): void => {
         icon: getIcon(kind),
         props: {
             description: getDescription(kind),
-            acceptLabel: getSetupCaption(kind),
-            onAccept,
-            rejectLabel: _t("encryption|verification|unverified_sessions_toast_reject"),
-            onReject,
+            primaryLabel: getSetupCaption(kind),
+            onPrimaryClick: onAccept,
+            secondaryLabel: _t("encryption|verification|unverified_sessions_toast_reject"),
+            onSecondaryClick: onReject,
+            destructive: "secondary",
         },
         component: GenericToast,
         priority: kind === Kind.VERIFY_THIS_SESSION ? 95 : 40,

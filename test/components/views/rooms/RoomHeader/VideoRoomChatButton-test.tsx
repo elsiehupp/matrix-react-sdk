@@ -17,15 +17,14 @@ limitations under the License.
 import React from "react";
 import { MockedObject } from "jest-mock";
 import { Room } from "matrix-js-sdk/src/matrix";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { TooltipProvider } from "@vector-im/compound-web";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { VideoRoomChatButton } from "../../../../../src/components/views/rooms/RoomHeader/VideoRoomChatButton";
 import { SDKContext, SdkContextClass } from "../../../../../src/contexts/SDKContext";
 import RightPanelStore from "../../../../../src/stores/right-panel/RightPanelStore";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../../../../test-utils";
 import { RoomNotificationState } from "../../../../../src/stores/notifications/RoomNotificationState";
-import { NotificationColor } from "../../../../../src/stores/notifications/NotificationColor";
+import { NotificationLevel } from "../../../../../src/stores/notifications/NotificationLevel";
 import { NotificationStateEvents } from "../../../../../src/stores/notifications/NotificationState";
 import { RightPanelPhases } from "../../../../../src/stores/right-panel/RightPanelStorePhases";
 
@@ -46,22 +45,18 @@ describe("<VideoRoomChatButton />", () => {
         return room;
     };
 
-    const mockRoomNotificationState = (room: Room, color: NotificationColor): RoomNotificationState => {
-        const roomNotificationState = new RoomNotificationState(room);
+    const mockRoomNotificationState = (room: Room, level: NotificationLevel): RoomNotificationState => {
+        const roomNotificationState = new RoomNotificationState(room, false);
 
         // @ts-ignore ugly mocking
-        roomNotificationState._color = color;
+        roomNotificationState._level = level;
         jest.spyOn(sdkContext.roomNotificationStateStore, "getRoomState").mockReturnValue(roomNotificationState);
         return roomNotificationState;
     };
 
     const getComponent = (room: Room) =>
         render(<VideoRoomChatButton room={room} />, {
-            wrapper: ({ children }) => (
-                <SDKContext.Provider value={sdkContext}>
-                    <TooltipProvider>{children}</TooltipProvider>
-                </SDKContext.Provider>
-            ),
+            wrapper: ({ children }) => <SDKContext.Provider value={sdkContext}>{children}</SDKContext.Provider>,
         });
 
     beforeEach(() => {
@@ -80,20 +75,6 @@ describe("<VideoRoomChatButton />", () => {
         jest.restoreAllMocks();
     });
 
-    it("does not render button when room is not a video room", () => {
-        const room = makeRoom(false);
-        getComponent(room);
-
-        expect(screen.queryByLabelText("Chat")).not.toBeInTheDocument();
-    });
-
-    it("renders button when room is a video room", () => {
-        const room = makeRoom();
-        getComponent(room);
-
-        expect(screen.getByLabelText("Chat")).toMatchSnapshot();
-    });
-
     it("toggles timeline in right panel on click", () => {
         const room = makeRoom();
         getComponent(room);
@@ -105,7 +86,7 @@ describe("<VideoRoomChatButton />", () => {
 
     it("renders button with an unread marker when room is unread", () => {
         const room = makeRoom();
-        mockRoomNotificationState(room, NotificationColor.Bold);
+        mockRoomNotificationState(room, NotificationLevel.Activity);
         getComponent(room);
 
         // snapshot includes `data-indicator` attribute
@@ -113,37 +94,37 @@ describe("<VideoRoomChatButton />", () => {
         expect(screen.getByLabelText("Chat").hasAttribute("data-indicator")).toBeTruthy();
     });
 
-    it("adds unread marker when room notification state changes to unread", () => {
+    it("adds unread marker when room notification state changes to unread", async () => {
         const room = makeRoom();
         // start in read state
-        const notificationState = mockRoomNotificationState(room, NotificationColor.None);
+        const notificationState = mockRoomNotificationState(room, NotificationLevel.None);
         getComponent(room);
 
         // no unread marker
         expect(screen.getByLabelText("Chat").hasAttribute("data-indicator")).toBeFalsy();
 
         // @ts-ignore ugly mocking
-        notificationState._color = NotificationColor.Red;
+        notificationState._level = NotificationLevel.Highlight;
         notificationState.emit(NotificationStateEvents.Update);
 
         // unread marker
-        expect(screen.getByLabelText("Chat").hasAttribute("data-indicator")).toBeTruthy();
+        await waitFor(() => expect(screen.getByLabelText("Chat").hasAttribute("data-indicator")).toBeTruthy());
     });
 
-    it("clears unread marker when room notification state changes to read", () => {
+    it("clears unread marker when room notification state changes to read", async () => {
         const room = makeRoom();
         // start in unread state
-        const notificationState = mockRoomNotificationState(room, NotificationColor.Red);
+        const notificationState = mockRoomNotificationState(room, NotificationLevel.Highlight);
         getComponent(room);
 
         // unread marker
         expect(screen.getByLabelText("Chat").hasAttribute("data-indicator")).toBeTruthy();
 
         // @ts-ignore ugly mocking
-        notificationState._color = NotificationColor.None;
+        notificationState._level = NotificationLevel.None;
         notificationState.emit(NotificationStateEvents.Update);
 
         // unread marker cleared
-        expect(screen.getByLabelText("Chat").hasAttribute("data-indicator")).toBeFalsy();
+        await waitFor(() => expect(screen.getByLabelText("Chat").hasAttribute("data-indicator")).toBeFalsy());
     });
 });

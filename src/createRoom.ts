@@ -50,6 +50,7 @@ import { shouldForceDisableEncryption } from "./utils/crypto/shouldForceDisableE
 import { waitForMember } from "./utils/membership";
 import { PreferredRoomVersions } from "./utils/PreferredRoomVersions";
 import SettingsStore from "./settings/SettingsStore";
+import { MEGOLM_ENCRYPTION_ALGORITHM } from "./utils/crypto";
 
 // we define a number of interfaces which take their names from the js-sdk
 /* eslint-disable camelcase */
@@ -220,7 +221,7 @@ export default async function createRoom(client: MatrixClient, opts: IOpts): Pro
             type: "m.room.encryption",
             state_key: "",
             content: {
-                algorithm: "m.megolm.v1.aes-sha2",
+                algorithm: MEGOLM_ENCRYPTION_ALGORITHM,
             },
         });
     }
@@ -347,15 +348,13 @@ export default async function createRoom(client: MatrixClient, opts: IOpts): Pro
                 await JitsiCall.create(await room);
 
                 // Reset our power level back to admin so that the widget becomes immutable
-                const plEvent = (await room).currentState.getStateEvents(EventType.RoomPowerLevels, "");
-                await client.setPowerLevel(roomId, client.getUserId()!, 100, plEvent);
+                await client.setPowerLevel(roomId, client.getUserId()!, 100);
             } else if (opts.roomType === RoomType.UnstableCall) {
                 // Set up this video room with an Element call
                 await ElementCall.create(await room);
 
                 // Reset our power level back to admin so that the call becomes immutable
-                const plEvent = (await room).currentState.getStateEvents(EventType.RoomPowerLevels, "");
-                await client.setPowerLevel(roomId, client.getUserId()!, 100, plEvent);
+                await client.setPowerLevel(roomId, client.getUserId()!, 100);
             }
         })
         .then(

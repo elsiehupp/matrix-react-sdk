@@ -59,10 +59,10 @@ const mapDeviceKindToHandlerValue = (deviceKind: MediaDeviceKindEnum): string | 
 
 export default class VoiceUserSettingsTab extends React.Component<{}, IState> {
     public static contextType = MatrixClientContext;
-    public context!: React.ContextType<typeof MatrixClientContext>;
+    public declare context: React.ContextType<typeof MatrixClientContext>;
 
-    public constructor(props: {}) {
-        super(props);
+    public constructor(props: {}, context: React.ContextType<typeof MatrixClientContext>) {
+        super(props, context);
 
         this.state = {
             mediaDevices: null,
@@ -180,7 +180,7 @@ export default class VoiceUserSettingsTab extends React.Component<{}, IState> {
 
         return (
             <SettingsTab>
-                <SettingsSection heading={_t("settings|voip|title")}>
+                <SettingsSection>
                     {requestButton}
                     <SettingsSubsection heading={_t("settings|voip|voice_section")} stretchContent>
                         {speakerDropdown}

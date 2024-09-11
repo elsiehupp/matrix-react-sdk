@@ -23,6 +23,7 @@ import {
     EventTimelineSet,
     Thread,
 } from "matrix-js-sdk/src/matrix";
+import { KnownMembership } from "matrix-js-sdk/src/types";
 
 import BaseCard from "./BaseCard";
 import ResizeNotifier from "../../../utils/ResizeNotifier";
@@ -76,6 +77,7 @@ interface IState {
 
 export default class TimelineCard extends React.Component<IProps, IState> {
     public static contextType = RoomContext;
+    public declare context: React.ContextType<typeof RoomContext>;
 
     private dispatcherRef?: string;
     private layoutWatcherRef?: string;
@@ -83,8 +85,8 @@ export default class TimelineCard extends React.Component<IProps, IState> {
     private card = React.createRef<HTMLDivElement>();
     private readReceiptsSettingWatcher: string | undefined;
 
-    public constructor(props: IProps) {
-        super(props);
+    public constructor(props: IProps, context: React.ContextType<typeof RoomContext>) {
+        super(props, context);
         this.state = {
             showReadReceipts: SettingsStore.getValue("showReadReceipts", props.room.roomId),
             layout: SettingsStore.getValue("layout"),
@@ -217,7 +219,7 @@ export default class TimelineCard extends React.Component<IProps, IState> {
         const isUploading = ContentMessages.sharedInstance().getCurrentUploads(this.props.composerRelation).length > 0;
 
         const myMembership = this.props.room.getMyMembership();
-        const showComposer = myMembership === "join";
+        const showComposer = myMembership === KnownMembership.Join;
 
         return (
             <RoomContext.Provider

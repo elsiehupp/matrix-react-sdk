@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import React from "react";
-import { MatrixEvent, Room, RoomStateEvent, EventType } from "matrix-js-sdk/src/matrix";
+import { EventType, MatrixEvent, Room, RoomStateEvent } from "matrix-js-sdk/src/matrix";
 import { logger } from "matrix-js-sdk/src/logger";
 import { Button, Text } from "@vector-im/compound-web";
 
@@ -28,7 +28,6 @@ import { Action } from "../../../dispatcher/actions";
 import ErrorDialog from "../dialogs/ErrorDialog";
 import BaseCard from "../right_panel/BaseCard";
 import { Flex } from "../../utils/Flex";
-import { SpaceScopeHeader } from "./SpaceScopeHeader";
 
 interface IProps {
     event: MatrixEvent;
@@ -101,7 +100,7 @@ export default class ThirdPartyMemberInfo extends React.Component<IProps, IState
 
     public onKickClick = (): void => {
         MatrixClientPeg.safeGet()
-            .sendStateEvent(this.state.roomId, "m.room.third_party_invite", {}, this.state.stateKey)
+            .sendStateEvent(this.state.roomId, EventType.RoomThirdPartyInvite, {}, this.state.stateKey)
             .catch((err) => {
                 logger.error(err);
 
@@ -133,10 +132,8 @@ export default class ThirdPartyMemberInfo extends React.Component<IProps, IState
             );
         }
 
-        const scopeHeader: JSX.Element | undefined = this.room ? <SpaceScopeHeader room={this.room} /> : undefined;
-
         return (
-            <BaseCard header={scopeHeader} onClose={this.props.onClose}>
+            <BaseCard onClose={this.props.onClose}>
                 <Flex className="mx_ThirdPartyMemberInfo" direction="column" gap="var(--cpd-space-4x)">
                     <Flex direction="column" as="section" justify="start" gap="var(--cpd-space-2x)">
                         {/* same as userinfo name style */}

@@ -18,7 +18,7 @@ import {
     AuthType,
     createClient,
     IAuthData,
-    IAuthDict,
+    AuthDict,
     IInputs,
     MatrixError,
     IRegisterRequestParams,
@@ -248,15 +248,20 @@ export default class Registration extends React.Component<IProps, IState> {
             logger.error("Failed to get login flows to check for SSO support", e);
         }
 
-        this.setState(({ flows }) => ({
-            matrixClient: cli,
-            ssoFlow,
-            oidcNativeFlow,
-            // if we are using oidc native we won't continue with flow discovery on HS
-            // so set an empty array to indicate flows are no longer loading
-            flows: oidcNativeFlow ? [] : flows,
-            busy: false,
-        }));
+        await new Promise<void>((resolve) => {
+            this.setState(
+                ({ flows }) => ({
+                    matrixClient: cli,
+                    ssoFlow,
+                    oidcNativeFlow,
+                    // if we are using oidc native we won't continue with flow discovery on HS
+                    // so set an empty array to indicate flows are no longer loading
+                    flows: oidcNativeFlow ? [] : flows,
+                    busy: false,
+                }),
+                resolve,
+            );
+        });
 
         // don't need to check with homeserver for login flows
         // since we are going to use OIDC native flow
@@ -478,7 +483,7 @@ export default class Registration extends React.Component<IProps, IState> {
         });
     };
 
-    private makeRegisterRequest = (auth: IAuthDict | null): Promise<RegisterResponse> => {
+    private makeRegisterRequest = (auth: AuthDict | null): Promise<RegisterResponse> => {
         if (!this.state.matrixClient) throw new Error("Matrix client has not yet been loaded");
 
         const registerParams: IRegisterRequestParams = {

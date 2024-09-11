@@ -26,6 +26,7 @@ import {
     M_POLL_START,
     M_POLL_END,
 } from "matrix-js-sdk/src/matrix";
+import { KnownMembership } from "matrix-js-sdk/src/types";
 import { logger } from "matrix-js-sdk/src/logger";
 import { removeDirectionOverrideChars } from "matrix-js-sdk/src/utils";
 import { PollStartEvent } from "matrix-js-sdk/src/extensible_events_v1/PollStartEvent";
@@ -39,12 +40,13 @@ import { WIDGET_LAYOUT_EVENT_TYPE } from "./stores/widgets/WidgetLayoutStore";
 import { RightPanelPhases } from "./stores/right-panel/RightPanelStorePhases";
 import defaultDispatcher from "./dispatcher/dispatcher";
 import { RoomSettingsTab } from "./components/views/dialogs/RoomSettingsDialog";
-import AccessibleButton, { ButtonEvent } from "./components/views/elements/AccessibleButton";
+import AccessibleButton from "./components/views/elements/AccessibleButton";
 import RightPanelStore from "./stores/right-panel/RightPanelStore";
 import { highlightEvent, isLocationEvent } from "./utils/EventUtils";
 import { ElementCall } from "./models/Call";
 import { textForVoiceBroadcastStoppedEvent, VoiceBroadcastInfoEventType } from "./voice-broadcast";
 import { getSenderName } from "./utils/event/getSenderName";
+import PosthogTrackers from "./PosthogTrackers.ts";
 
 function getRoomMemberDisplayname(client: MatrixClient, event: MatrixEvent, userId = event.getSender()): string {
     const roomId = event.getRoomId();
@@ -122,7 +124,7 @@ function textForMemberEvent(
     const reason = content.reason;
 
     switch (content.membership) {
-        case "invite": {
+        case KnownMembership.Invite: {
             const threePidContent = content.third_party_invite;
             if (threePidContent) {
                 if (threePidContent.display_name) {
@@ -138,13 +140,13 @@ function textForMemberEvent(
                 return () => _t("timeline|m.room.member|invite", { senderName, targetName });
             }
         }
-        case "ban":
+        case KnownMembership.Ban:
             return () =>
                 reason
                     ? _t("timeline|m.room.member|ban_reason", { senderName, targetName, reason })
                     : _t("timeline|m.room.member|ban", { senderName, targetName });
-        case "join":
-            if (prevContent && prevContent.membership === "join") {
+        case KnownMembership.Join:
+            if (prevContent && prevContent.membership === KnownMembership.Join) {
                 const modDisplayname = getModification(prevContent.displayname, content.displayname);
                 const modAvatarUrl = getModification(prevContent.avatar_url, content.avatar_url);
 
@@ -194,9 +196,9 @@ function textForMemberEvent(
                 if (!ev.target) logger.warn("Join message has no target! -- " + ev.getContent().state_key);
                 return () => _t("timeline|m.room.member|join", { targetName });
             }
-        case "leave":
+        case KnownMembership.Leave:
             if (ev.getSender() === ev.getStateKey()) {
-                if (prevContent.membership === "invite") {
+                if (prevContent.membership === KnownMembership.Invite) {
                     return () => _t("timeline|m.room.member|reject_invite", { targetName });
                 } else {
                     return () =>
@@ -204,9 +206,9 @@ function textForMemberEvent(
                             ? _t("timeline|m.room.member|left_reason", { targetName, reason })
                             : _t("timeline|m.room.member|left", { targetName });
                 }
-            } else if (prevContent.membership === "ban") {
+            } else if (prevContent.membership === KnownMembership.Ban) {
                 return () => _t("timeline|m.room.member|unban", { senderName, targetName });
-            } else if (prevContent.membership === "invite") {
+            } else if (prevContent.membership === KnownMembership.Invite) {
                 return () =>
                     reason
                         ? _t("timeline|m.room.member|withdrew_invite_reason", {
@@ -215,7 +217,7 @@ function textForMemberEvent(
                               reason,
                           })
                         : _t("timeline|m.room.member|withdrew_invite", { senderName, targetName });
-            } else if (prevContent.membership === "join") {
+            } else if (prevContent.membership === KnownMembership.Join) {
                 return () =>
                     reason
                         ? _t("timeline|m.room.member|kick_reason", {
@@ -562,6 +564,7 @@ function textForPowerEvent(event: MatrixEvent, client: MatrixClient): (() => str
 }
 
 const onPinnedMessagesClick = (): void => {
+    PosthogTrackers.trackInteraction("PinnedMessageStateEventClick");
     RightPanelStore.instance.setCard({ phase: RightPanelPhases.PinnedMessages }, false);
 };
 
@@ -589,7 +592,10 @@ function textForPinnedEvent(event: MatrixEvent, client: MatrixClient, allowJSX: 
                             a: (sub) => (
                                 <AccessibleButton
                                     kind="link_inline"
-                                    onClick={(e: ButtonEvent) => highlightEvent(roomId, messageId)}
+                                    onClick={() => {
+                                        PosthogTrackers.trackInteraction("PinnedMessageStateEventClick");
+                                        highlightEvent(roomId, messageId);
+                                    }}
                                 >
                                     {sub}
                                 </AccessibleButton>
@@ -622,7 +628,10 @@ function textForPinnedEvent(event: MatrixEvent, client: MatrixClient, allowJSX: 
                             a: (sub) => (
                                 <AccessibleButton
                                     kind="link_inline"
-                                    onClick={(e: ButtonEvent) => highlightEvent(roomId, messageId)}
+                                    onClick={() => {
+                                        PosthogTrackers.trackInteraction("PinnedMessageStateEventClick");
+                                        highlightEvent(roomId, messageId);
+                                    }}
                                 >
                                     {sub}
                                 </AccessibleButton>

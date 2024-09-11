@@ -26,7 +26,11 @@ import SdkConfig from "../../../SdkConfig";
 import { SettingLevel } from "../../../settings/SettingLevel";
 import SettingsStore from "../../../settings/SettingsStore";
 import { Protocols } from "../../../utils/DirectoryUtils";
-import { GenericDropdownMenu, GenericDropdownMenuItem } from "../../structures/GenericDropdownMenu";
+import {
+    AdditionalOptionsProps,
+    GenericDropdownMenu,
+    GenericDropdownMenuItem,
+} from "../../structures/GenericDropdownMenu";
 import TextInputDialog from "../dialogs/TextInputDialog";
 import AccessibleButton from "../elements/AccessibleButton";
 import withValidation from "../elements/Validation";
@@ -118,7 +122,7 @@ function useServers(): ServerList {
         SettingLevel.ACCOUNT,
     );
 
-    const homeServer = MatrixClientPeg.getHomeserverName();
+    const homeServer = MatrixClientPeg.safeGet().getDomain()!;
     const configServers = new Set<string>(SdkConfig.getObject("room_directory")?.get("servers") ?? []);
     removeAll(configServers, homeServer);
     // configured servers take preference over user-defined ones, if one occurs in both ignore the latter one.
@@ -181,7 +185,7 @@ export const NetworkDropdown: React.FC<IProps> = ({ protocols, config, setConfig
     }));
 
     const addNewServer = useCallback(
-        ({ closeMenu }) => (
+        ({ closeMenu }: AdditionalOptionsProps) => (
             <>
                 <span className="mx_GenericDropdownMenu_divider" />
                 <MenuItemRadio

@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import React, { createRef, KeyboardEvent, SyntheticEvent } from "react";
-import EMOJI_REGEX from "emojibase-regex";
 import {
     IContent,
     MatrixEvent,
@@ -30,6 +29,7 @@ import {
 import { DebouncedFunc, throttle } from "lodash";
 import { logger } from "matrix-js-sdk/src/logger";
 import { Composer as ComposerEvent } from "@matrix-org/analytics-events/types/typescript/Composer";
+import { RoomMessageEventContent } from "matrix-js-sdk/src/types";
 
 import dis from "../../../dispatcher/dispatcher";
 import EditorModel from "../../../editor/model";
@@ -69,6 +69,10 @@ import { doMaybeLocalRoomAction } from "../../../utils/local-room";
 import { Caret } from "../../../editor/caret";
 import { IDiff } from "../../../editor/diff";
 import { getBlobSafeMimeType } from "../../../utils/blobs";
+import { EMOJI_REGEX } from "../../../HtmlUtils";
+
+// The prefix used when persisting editor drafts to localstorage.
+export const EDITOR_STATE_STORAGE_PREFIX = "mx_cider_state_";
 
 /**
  * Build the mentions information based on the editor model (and any related events):
@@ -183,7 +187,7 @@ export function createMessageContent(
     relation: IEventRelation | undefined,
     permalinkCreator?: RoomPermalinkCreator,
     includeReplyLegacyFallback = true,
-): IContent {
+): RoomMessageEventContent {
     const isEmote = containsEmote(model);
     if (isEmote) {
         model = stripEmoteCommand(model);
@@ -195,7 +199,7 @@ export function createMessageContent(
 
     const body = textSerialize(model);
 
-    const content: IContent = {
+    const content: RoomMessageEventContent = {
         msgtype: isEmote ? MsgType.Emote : MsgType.Text,
         body: body,
     };
@@ -253,7 +257,7 @@ interface ISendMessageComposerProps extends MatrixClientProps {
 
 export class SendMessageComposer extends React.Component<ISendMessageComposerProps> {
     public static contextType = RoomContext;
-    public context!: React.ContextType<typeof RoomContext>;
+    public declare context: React.ContextType<typeof RoomContext>;
 
     private readonly prepareToEncrypt?: DebouncedFunc<() => void>;
     private readonly editorRef = createRef<BasicMessageComposer>();
@@ -268,7 +272,6 @@ export class SendMessageComposer extends React.Component<ISendMessageComposerPro
 
     public constructor(props: ISendMessageComposerProps, context: React.ContextType<typeof RoomContext>) {
         super(props, context);
-        this.context = context; // otherwise React will only set it prior to render due to type def above
 
         if (this.props.mxClient.isCryptoEnabled() && this.props.mxClient.isRoomEncrypted(this.props.room.roomId)) {
             this.prepareToEncrypt = throttle(
@@ -432,7 +435,7 @@ export class SendMessageComposer extends React.Component<ISendMessageComposerPro
                     MatrixClientPeg.safeGet().sendEvent(lastMessage.getRoomId()!, EventType.Reaction, {
                         "m.relates_to": {
                             rel_type: RelationType.Annotation,
-                            event_id: lastMessage.getId(),
+                            event_id: lastMessage.getId()!,
                             key: reaction,
                         },
                     });
@@ -475,7 +478,7 @@ export class SendMessageComposer extends React.Component<ISendMessageComposerPro
 
         const replyToEvent = this.props.replyToEvent;
         let shouldSend = true;
-        let content: IContent | null = null;
+        let content: RoomMessageEventContent | null = null;
 
         if (!containsEmote(model) && isSlashCommand(this.model)) {
             const [cmd, args, commandText] = getSlashCommand(this.model);
@@ -604,7 +607,7 @@ export class SendMessageComposer extends React.Component<ISendMessageComposerPro
     }
 
     private get editorStateKey(): string {
-        let key = `mx_cider_state_${this.props.room.roomId}`;
+        let key = EDITOR_STATE_STORAGE_PREFIX + this.props.room.roomId;
         if (this.props.relation?.rel_type === THREAD_RELATION_TYPE.name) {
             key += `_${this.props.relation.event_id}`;
         }

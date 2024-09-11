@@ -21,7 +21,6 @@ import {
     LOCAL_NOTIFICATION_SETTINGS_PREFIX,
     MatrixEvent,
     Room,
-    NotificationCountType,
     PushRuleActionName,
     TweakName,
     ConditionKind,
@@ -31,7 +30,16 @@ import {
     ThreepidMedium,
 } from "matrix-js-sdk/src/matrix";
 import { randomString } from "matrix-js-sdk/src/randomstring";
-import { act, fireEvent, getByTestId, render, screen, waitFor, within } from "@testing-library/react";
+import {
+    act,
+    fireEvent,
+    getByTestId,
+    render,
+    screen,
+    waitFor,
+    waitForElementToBeRemoved,
+    within,
+} from "@testing-library/react";
 import { mocked } from "jest-mock";
 import userEvent from "@testing-library/user-event";
 
@@ -245,7 +253,7 @@ describe("<Notifications />", () => {
     // get component, wait for async data and force a render
     const getComponentAndWait = async () => {
         const component = getComponent();
-        await flushPromises();
+        await waitForElementToBeRemoved(() => component.queryAllByRole("progressbar"));
         return component;
     };
 
@@ -528,7 +536,9 @@ describe("<Notifications />", () => {
             // oneToOneRule is set to 'on'
             // and is kind: 'underride'
             const offToggle = screen.getByTestId(section + oneToOneRule.rule_id).querySelector('input[type="radio"]')!;
-            fireEvent.click(offToggle);
+            await act(() => {
+                fireEvent.click(offToggle);
+            });
 
             await flushPromises();
 
@@ -553,7 +563,9 @@ describe("<Notifications />", () => {
             // oneToOneRule is set to 'on'
             // and is kind: 'underride'
             const offToggle = screen.getByTestId(section + oneToOneRule.rule_id).querySelector('input[type="radio"]')!;
-            fireEvent.click(offToggle);
+            await act(() => {
+                fireEvent.click(offToggle);
+            });
 
             await flushPromises();
 
@@ -577,7 +589,7 @@ describe("<Notifications />", () => {
 
             await flushPromises();
 
-            // no error after after successful change
+            // no error after successful change
             expect(
                 within(oneToOneRuleElement).queryByText(
                     "An error occurred when updating your notification preferences. Please try to toggle your option again.",
@@ -717,7 +729,9 @@ describe("<Notifications />", () => {
                 mockClient.setPushRuleActions.mockRejectedValue("oups");
 
                 const offToggle = oneToOneRuleElement.querySelector('input[type="radio"]')!;
-                fireEvent.click(offToggle);
+                await act(() => {
+                    fireEvent.click(offToggle);
+                });
 
                 await flushPromises();
 
@@ -815,7 +829,9 @@ describe("<Notifications />", () => {
 
             mockClient.setPushRuleEnabled.mockRejectedValueOnce("oups");
 
-            fireEvent.click(within(screen.getByTestId(section + keywordsRuleId)).getByLabelText("Off"));
+            await act(() => {
+                fireEvent.click(within(screen.getByTestId(section + keywordsRuleId)).getByLabelText("Off"));
+            });
 
             await flushPromises();
 
@@ -900,8 +916,7 @@ describe("<Notifications />", () => {
                 user: "@alice:example.org",
                 ts: 1,
             });
-            room.addLiveEvents([message]);
-            room.setUnreadNotificationCount(NotificationCountType.Total, 1);
+            await room.addLiveEvents([message]);
 
             const { container } = await getComponentAndWait();
             const clearNotificationEl = getByTestId(container, "clear-notifications");
@@ -909,11 +924,8 @@ describe("<Notifications />", () => {
             fireEvent.click(clearNotificationEl);
 
             expect(clearNotificationEl.className).toContain("mx_AccessibleButton_disabled");
+            await waitFor(() => expect(clearNotificationEl.className).not.toContain("mx_AccessibleButton_disabled"));
             expect(mockClient.sendReadReceipt).toHaveBeenCalled();
-
-            await waitFor(() => {
-                expect(clearNotificationEl).not.toBeInTheDocument();
-            });
         });
     });
 });

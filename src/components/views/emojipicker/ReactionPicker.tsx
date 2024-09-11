@@ -37,7 +37,7 @@ interface IState {
 
 class ReactionPicker extends React.Component<IProps, IState> {
     public static contextType = RoomContext;
-    public context!: React.ContextType<typeof RoomContext>;
+    public declare context: React.ContextType<typeof RoomContext>;
 
     public constructor(props: IProps, context: React.ContextType<typeof RoomContext>) {
         super(props, context);
@@ -108,7 +108,7 @@ class ReactionPicker extends React.Component<IProps, IState> {
             MatrixClientPeg.safeGet().sendEvent(this.props.mxEvent.getRoomId()!, EventType.Reaction, {
                 "m.relates_to": {
                     rel_type: RelationType.Annotation,
-                    event_id: this.props.mxEvent.getId(),
+                    event_id: this.props.mxEvent.getId()!,
                     key: reaction,
                 },
             });

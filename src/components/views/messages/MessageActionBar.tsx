@@ -24,8 +24,13 @@ import {
     MsgType,
     RelationType,
     M_BEACON_INFO,
+    EventTimeline,
+    RoomStateEvent,
+    EventType,
 } from "matrix-js-sdk/src/matrix";
 import classNames from "classnames";
+import { Icon as PinIcon } from "@vector-im/compound-design-tokens/icons/pin.svg";
+import { Icon as UnpinIcon } from "@vector-im/compound-design-tokens/icons/unpin.svg";
 
 import { Icon as ContextMenuIcon } from "../../../../res/img/element-icons/context-menu.svg";
 import { Icon as EditIcon } from "../../../../res/img/element-icons/room/message-bar/edit.svg";
@@ -43,7 +48,7 @@ import ContextMenu, { aboveLeftOf, ContextMenuTooltipButton, useContextMenu } fr
 import { isContentActionable, canEditContent, editEvent, canCancel } from "../../../utils/EventUtils";
 import RoomContext, { TimelineRenderingType } from "../../../contexts/RoomContext";
 import Toolbar from "../../../accessibility/Toolbar";
-import { RovingAccessibleTooltipButton, useRovingTabIndex } from "../../../accessibility/RovingTabIndex";
+import { RovingAccessibleButton, useRovingTabIndex } from "../../../accessibility/RovingTabIndex";
 import MessageContextMenu from "../context_menus/MessageContextMenu";
 import Resend from "../../../Resend";
 import { MatrixClientPeg } from "../../../MatrixClientPeg";
@@ -61,6 +66,8 @@ import { ShowThreadPayload } from "../../../dispatcher/payloads/ShowThreadPayloa
 import { GetRelationsForEvent, IEventTileType } from "../rooms/EventTile";
 import { VoiceBroadcastInfoEventType } from "../../../voice-broadcast/types";
 import { ButtonEvent } from "../elements/AccessibleButton";
+import PinningUtils from "../../../utils/PinningUtils";
+import PosthogTrackers from "../../../PosthogTrackers.ts";
 
 interface IOptionsButtonProps {
     mxEvent: MatrixEvent;
@@ -129,6 +136,7 @@ const OptionsButton: React.FC<IOptionsButtonProps> = ({
                 ref={button}
                 onFocus={onFocus}
                 tabIndex={isActive ? 0 : -1}
+                placement="left"
             >
                 <ContextMenuIcon />
             </ContextMenuTooltipButton>
@@ -186,6 +194,7 @@ const ReactButton: React.FC<IReactButtonProps> = ({ mxEvent, reactions, onFocusC
                 ref={button}
                 onFocus={onFocus}
                 tabIndex={isActive ? 0 : -1}
+                placement="left"
             >
                 <EmojiIcon />
             </ContextMenuTooltipButton>
@@ -229,25 +238,19 @@ const ReplyInThreadButton: React.FC<IReplyInThreadButton> = ({ mxEvent }) => {
         }
     };
 
+    const title = !hasARelation ? _t("action|reply_in_thread") : _t("threads|error_start_thread_existing_relation");
+
     return (
-        <RovingAccessibleTooltipButton
+        <RovingAccessibleButton
             className="mx_MessageActionBar_iconButton mx_MessageActionBar_threadButton"
             disabled={hasARelation}
-            tooltip={
-                <>
-                    <div className="mx_Tooltip_title">
-                        {!hasARelation
-                            ? _t("action|reply_in_thread")
-                            : _t("threads|error_start_thread_existing_relation")}
-                    </div>
-                </>
-            }
-            title={!hasARelation ? _t("action|reply_in_thread") : _t("threads|error_start_thread_existing_relation")}
+            title={title}
             onClick={onClick}
             onContextMenu={onClick}
+            placement="left"
         >
             <ThreadIcon />
-        </RovingAccessibleTooltipButton>
+        </RovingAccessibleButton>
     );
 };
 
@@ -265,6 +268,7 @@ interface IMessageActionBarProps {
 
 export default class MessageActionBar extends React.PureComponent<IMessageActionBarProps> {
     public static contextType = RoomContext;
+    public declare context: React.ContextType<typeof RoomContext>;
 
     public componentDidMount(): void {
         if (this.props.mxEvent.status && this.props.mxEvent.status !== EventStatus.SENT) {
@@ -278,12 +282,20 @@ export default class MessageActionBar extends React.PureComponent<IMessageAction
             this.props.mxEvent.once(MatrixEventEvent.Decrypted, this.onDecrypted);
         }
         this.props.mxEvent.on(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
+        this.context.room
+            ?.getLiveTimeline()
+            .getState(EventTimeline.FORWARDS)
+            ?.on(RoomStateEvent.Events, this.onRoomEvent);
     }
 
     public componentWillUnmount(): void {
         this.props.mxEvent.off(MatrixEventEvent.Status, this.onSent);
         this.props.mxEvent.off(MatrixEventEvent.Decrypted, this.onDecrypted);
         this.props.mxEvent.off(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
+        this.context.room
+            ?.getLiveTimeline()
+            .getState(EventTimeline.FORWARDS)
+            ?.off(RoomStateEvent.Events, this.onRoomEvent);
     }
 
     private onDecrypted = (): void => {
@@ -294,6 +306,12 @@ export default class MessageActionBar extends React.PureComponent<IMessageAction
 
     private onBeforeRedaction = (): void => {
         // When an event is redacted, we can't edit it so update the available actions.
+        this.forceUpdate();
+    };
+
+    private onRoomEvent = (event?: MatrixEvent): void => {
+        // If the event is pinned or unpinned, rerender the component.
+        if (!event || event.getType() !== EventType.RoomPinnedEvents) return;
         this.forceUpdate();
     };
 
@@ -387,32 +405,65 @@ export default class MessageActionBar extends React.PureComponent<IMessageAction
         );
     };
 
+    /**
+     * Pin or unpin the event.
+     */
+    private onPinClick = async (event: ButtonEvent, isPinned: boolean): Promise<void> => {
+        // Don't open the regular browser or our context menu on right-click
+        event.preventDefault();
+        event.stopPropagation();
+
+        await PinningUtils.pinOrUnpinEvent(MatrixClientPeg.safeGet(), this.props.mxEvent);
+        PosthogTrackers.trackPinUnpinMessage(isPinned ? "Pin" : "Unpin", "Timeline");
+    };
+
     public render(): React.ReactNode {
         const toolbarOpts: JSX.Element[] = [];
         if (canEditContent(MatrixClientPeg.safeGet(), this.props.mxEvent)) {
             toolbarOpts.push(
-                <RovingAccessibleTooltipButton
+                <RovingAccessibleButton
                     className="mx_MessageActionBar_iconButton"
                     title={_t("action|edit")}
                     onClick={this.onEditClick}
                     onContextMenu={this.onEditClick}
                     key="edit"
+                    placement="left"
                 >
                     <EditIcon />
-                </RovingAccessibleTooltipButton>,
+                </RovingAccessibleButton>,
+            );
+        }
+
+        if (
+            PinningUtils.canPin(MatrixClientPeg.safeGet(), this.props.mxEvent) ||
+            PinningUtils.canUnpin(MatrixClientPeg.safeGet(), this.props.mxEvent)
+        ) {
+            const isPinned = PinningUtils.isPinned(MatrixClientPeg.safeGet(), this.props.mxEvent);
+            toolbarOpts.push(
+                <RovingAccessibleButton
+                    className="mx_MessageActionBar_iconButton"
+                    title={isPinned ? _t("action|unpin") : _t("action|pin")}
+                    onClick={(e) => this.onPinClick(e, isPinned)}
+                    onContextMenu={(e: ButtonEvent) => this.onPinClick(e, isPinned)}
+                    key="pin"
+                    placement="left"
+                >
+                    {isPinned ? <UnpinIcon /> : <PinIcon />}
+                </RovingAccessibleButton>,
             );
         }
 
         const cancelSendingButton = (
-            <RovingAccessibleTooltipButton
+            <RovingAccessibleButton
                 className="mx_MessageActionBar_iconButton"
                 title={_t("action|delete")}
                 onClick={this.onCancelClick}
                 onContextMenu={this.onCancelClick}
                 key="cancel"
+                placement="left"
             >
                 <TrashcanIcon />
-            </RovingAccessibleTooltipButton>
+            </RovingAccessibleButton>
         );
 
         const threadTooltipButton = <ReplyInThreadButton mxEvent={this.props.mxEvent} key="reply_thread" />;
@@ -429,15 +480,16 @@ export default class MessageActionBar extends React.PureComponent<IMessageAction
             toolbarOpts.splice(
                 0,
                 0,
-                <RovingAccessibleTooltipButton
+                <RovingAccessibleButton
                     className="mx_MessageActionBar_iconButton"
                     title={_t("action|retry")}
                     onClick={this.onResendClick}
                     onContextMenu={this.onResendClick}
                     key="resend"
+                    placement="left"
                 >
                     <ResendIcon />
-                </RovingAccessibleTooltipButton>,
+                </RovingAccessibleButton>,
             );
 
             // The delete button should appear last, so we can just drop it at the end
@@ -455,15 +507,16 @@ export default class MessageActionBar extends React.PureComponent<IMessageAction
                     toolbarOpts.splice(
                         0,
                         0,
-                        <RovingAccessibleTooltipButton
+                        <RovingAccessibleButton
                             className="mx_MessageActionBar_iconButton"
                             title={_t("action|reply")}
                             onClick={this.onReplyClick}
                             onContextMenu={this.onReplyClick}
                             key="reply"
+                            placement="left"
                         >
                             <ReplyIcon />
-                        </RovingAccessibleTooltipButton>,
+                        </RovingAccessibleButton>,
                     );
                 }
                 // We hide the react button in search results as we don't show reactions in results
@@ -509,32 +562,22 @@ export default class MessageActionBar extends React.PureComponent<IMessageAction
                     mx_MessageActionBar_iconButton: true,
                     mx_MessageActionBar_expandCollapseMessageButton: true,
                 });
-                const tooltip = (
-                    <>
-                        <div className="mx_Tooltip_title">
-                            {this.props.isQuoteExpanded
-                                ? _t("timeline|mab|collapse_reply_chain")
-                                : _t("timeline|mab|expand_reply_chain")}
-                        </div>
-                        <div className="mx_Tooltip_sub">
-                            {_t(ALTERNATE_KEY_NAME[Key.SHIFT]) + " + " + _t("action|click")}
-                        </div>
-                    </>
-                );
+
                 toolbarOpts.push(
-                    <RovingAccessibleTooltipButton
+                    <RovingAccessibleButton
                         className={expandClassName}
                         title={
                             this.props.isQuoteExpanded
                                 ? _t("timeline|mab|collapse_reply_chain")
                                 : _t("timeline|mab|expand_reply_chain")
                         }
-                        tooltip={tooltip}
+                        caption={_t(ALTERNATE_KEY_NAME[Key.SHIFT]) + " + " + _t("action|click")}
                         onClick={this.props.toggleThreadExpanded}
                         key="expand"
+                        placement="left"
                     >
                         {this.props.isQuoteExpanded ? <CollapseMessageIcon /> : <ExpandMessageIcon />}
-                    </RovingAccessibleTooltipButton>,
+                    </RovingAccessibleButton>,
                 );
             }
 

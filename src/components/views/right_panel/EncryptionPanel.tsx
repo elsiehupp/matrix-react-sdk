@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { VerificationPhase, VerificationRequest, VerificationRequestEvent } from "matrix-js-sdk/src/crypto-api";
 import { RoomMember, User } from "matrix-js-sdk/src/matrix";
+import { logger } from "matrix-js-sdk/src/logger";
 
 import EncryptionInfo from "./EncryptionInfo";
 import VerificationPanel from "./VerificationPanel";
@@ -48,7 +49,12 @@ const EncryptionPanel: React.FC<IProps> = (props: IProps) => {
     // state to show a spinner immediately after clicking "start verification",
     // before we have a request
     const [isRequesting, setRequesting] = useState(false);
-    const [phase, setPhase] = useState(request?.phase);
+    const [phase, doSetPhase] = useState(request?.phase);
+    const setPhase = (phase: VerificationPhase | undefined): void => {
+        logger.debug(`EncryptionPanel: phase now ${phase === undefined ? phase : VerificationPhase[phase]}`);
+        doSetPhase(phase);
+    };
+
     useEffect(() => {
         setRequest(verificationRequest);
         if (verificationRequest) {
@@ -69,13 +75,17 @@ const EncryptionPanel: React.FC<IProps> = (props: IProps) => {
             awaitPromise();
         }
     }, [verificationRequestPromise]);
+    // Use a ref to track whether we are already showing the mismatch modal as state may not update fast enough
+    // if two change events are fired in quick succession like can happen with rust crypto.
+    const isShowingMismatchModal = useRef(false);
     const changeHandler = useCallback(() => {
         // handle transitions -> cancelled for mismatches which fire a modal instead of showing a card
         if (
-            request &&
-            request.phase === VerificationPhase.Cancelled &&
+            !isShowingMismatchModal.current &&
+            request?.phase === VerificationPhase.Cancelled &&
             MISMATCHES.includes(request.cancellationCode ?? "")
         ) {
+            isShowingMismatchModal.current = true;
             Modal.createDialog(ErrorDialog, {
                 headerImage: require("../../../../res/img/e2e/warning-deprecated.svg").default,
                 title: _t("encryption|messages_not_secure|title"),

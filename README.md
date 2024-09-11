@@ -2,8 +2,6 @@
 ![Tests](https://github.com/matrix-org/matrix-react-sdk/actions/workflows/tests.yml/badge.svg)
 [![Playwright](https://img.shields.io/badge/Playwright-end_to_end_tests-blue)](https://e2e-develop--matrix-react-sdk.netlify.app/)
 ![Static Analysis](https://github.com/matrix-org/matrix-react-sdk/actions/workflows/static_analysis.yaml/badge.svg)
-[![Knapsack Pro Parallel CI builds for Cypress Test - Legacy Crypto](https://img.shields.io/badge/Knapsack%20Pro-Parallel%20%2F%20Cypress%20Test%20--%20Legacy%20Crypto-%230074ff)](https://knapsackpro.com/dashboard/organizations/3882/projects/2469/test_suites/3724/builds?utm_campaign=organization-id-3882&utm_content=test-suite-id-3724&utm_medium=readme&utm_source=knapsack-pro-badge&utm_term=project-id-2469)
-[![Knapsack Pro Parallel CI builds for Cypress Test - Rust Crypto](https://img.shields.io/badge/Knapsack%20Pro-Parallel%20%2F%20Cypress%20Test%20--%20Rust%20Crypto-%230074ff)](https://knapsackpro.com/dashboard/organizations/3882/projects/2469/test_suites/3729/builds?utm_campaign=organization-id-3882&utm_content=test-suite-id-3729&utm_medium=readme&utm_source=knapsack-pro-badge&utm_term=project-id-2469)
 [![Localazy](https://img.shields.io/endpoint?url=https%3A%2F%2Fconnect.localazy.com%2Fstatus%2Felement-web%2Fdata%3Fcontent%3Dall%26title%3Dlocalazy%26logo%3Dtrue)](https://localazy.com/p/element-web)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=matrix-react-sdk&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=matrix-react-sdk)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=matrix-react-sdk&metric=coverage)](https://sonarcloud.io/summary/new_code?id=matrix-react-sdk)
@@ -12,22 +10,18 @@
 
 # matrix-react-sdk
 
-This is a react-based SDK for inserting a Matrix chat/voip client into a web page.
+## matrix-react-sdk is now actively maintained at [element-hq/matrix-react-sdk](https://github.com/element-hq/matrix-react-sdk)
 
-This package provides the React components needed to build a Matrix web client
-using React. It is not useable in isolation, and instead must be used from
-a 'skin'. A skin provides:
+This is a react-based SDK for inserting a Matrix chat/voip client into a web page developed from 2015 through 2024 as part of the Matrix.org Foundation.
 
--   Customised implementations of presentation components.
--   Custom CSS
--   The containing application
--   Zero or more 'modules' containing non-UI functionality
+This package provides the React components needed to build a Matrix web client using React. It is not usable in isolation, and instead must be used from a 'skin'.
 
-As of Aug 2018, the only skin that exists is
-[`vector-im/element-web`](https://github.com/vector-im/element-web/); it and
-`matrix-org/matrix-react-sdk` should effectively
-be considered as a single project (for instance, matrix-react-sdk bugs
-are currently filed against vector-im/element-web rather than this project).
+The only skin that existed during its development was [ vector-im/element-web](https://github.com/element-hq/element-web); it and `matrix-org/matrix-react-sdk` have effectively been considered as a single project (for instance, matrix-react-sdk bugs have been filed against vector-im/element-web rather than this project). For this reason it is now maintained at [element-hq/matrix-react-sdk](https://github.com/element-hq/matrix-react-sdk).
+
+See the following blog posts for more information:
+
+-   https://matrix.org/blog/2024/08/heart-of-matrix/
+-   https://element.io/blog/sustainable-licensing-at-element-with-agpl/
 
 ## Developer Guide
 
@@ -206,5 +200,5 @@ Now the yarn commands should work as normal.
 
 ### End-to-End tests
 
-We use Cypress and Element Web for end-to-end tests. See
-[`docs/cypress.md`](docs/cypress.md) for more information.
+We use Playwright and Element Web for end-to-end tests. See
+[`docs/playwright.md`](docs/playwright.md) for more information.

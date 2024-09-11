@@ -16,7 +16,6 @@ limitations under the License.
 
 import React, { ComponentProps } from "react";
 import { act, fireEvent, render } from "@testing-library/react";
-import { TooltipProvider } from "@vector-im/compound-web";
 
 import { FilteredDeviceList } from "../../../../../src/components/views/settings/devices/FilteredDeviceList";
 import { DeviceSecurityVariation } from "../../../../../src/components/views/settings/devices/types";
@@ -82,11 +81,7 @@ describe("<FilteredDeviceList />", () => {
         supportsMSC3881: true,
     };
 
-    const getComponent = (props = {}) => (
-        <TooltipProvider>
-            <FilteredDeviceList {...defaultProps} {...props} />
-        </TooltipProvider>
-    );
+    const getComponent = (props = {}) => <FilteredDeviceList {...defaultProps} {...props} />;
 
     afterAll(() => {
         jest.spyOn(global.Date, "now").mockRestore();
@@ -125,16 +120,15 @@ describe("<FilteredDeviceList />", () => {
     });
 
     describe("filtering", () => {
-        const setFilter = async (container: HTMLElement, option: DeviceSecurityVariation | string) =>
-            await act(async () => {
-                const dropdown = container.querySelector('[aria-label="Filter devices"]');
+        const setFilter = async (container: HTMLElement, option: DeviceSecurityVariation | string) => {
+            const dropdown = container.querySelector('[aria-label="Filter devices"]');
 
-                fireEvent.click(dropdown as Element);
-                // tick to let dropdown render
-                await flushPromises();
+            fireEvent.click(dropdown as Element);
+            // tick to let dropdown render
+            await flushPromises();
 
-                fireEvent.click(container.querySelector(`#device-list-filter__${option}`) as Element);
-            });
+            fireEvent.click(container.querySelector(`#device-list-filter__${option}`) as Element);
+        };
 
         it("does not display filter description when filter is falsy", () => {
             const { container } = render(getComponent({ filter: undefined }));

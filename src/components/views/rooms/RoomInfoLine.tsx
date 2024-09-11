@@ -16,15 +16,16 @@ limitations under the License.
 
 import React, { FC } from "react";
 import { Room, JoinRule, MatrixClient } from "matrix-js-sdk/src/matrix";
+import { KnownMembership } from "matrix-js-sdk/src/types";
 
 import { _t } from "../../../languageHandler";
 import RightPanelStore from "../../../stores/right-panel/RightPanelStore";
 import { RightPanelPhases } from "../../../stores/right-panel/RightPanelStorePhases";
 import { useAsyncMemo } from "../../../hooks/useAsyncMemo";
 import { useRoomState } from "../../../hooks/useRoomState";
-import { useFeatureEnabled } from "../../../hooks/useSettings";
 import { useRoomMemberCount, useMyRoomMembership } from "../../../hooks/useRoomMembers";
 import AccessibleButton from "../elements/AccessibleButton";
+import { useIsVideoRoom } from "../../../utils/video-rooms";
 
 interface IProps {
     room: Room;
@@ -33,7 +34,7 @@ interface IProps {
 const RoomInfoLine: FC<IProps> = ({ room }) => {
     // summary will begin as undefined whilst loading and go null if it fails to load or we are not invited.
     const summary = useAsyncMemo(async (): Promise<Awaited<ReturnType<MatrixClient["getRoomSummary"]>> | null> => {
-        if (room.getMyMembership() !== "invite") return null;
+        if (room.getMyMembership() !== KnownMembership.Invite) return null;
         try {
             return await room.client.getRoomSummary(room.roomId);
         } catch (e) {
@@ -44,8 +45,7 @@ const RoomInfoLine: FC<IProps> = ({ room }) => {
     const membership = useMyRoomMembership(room);
     const memberCount = useRoomMemberCount(room);
 
-    const elementCallVideoRoomsEnabled = useFeatureEnabled("feature_element_call_video_rooms");
-    const isVideoRoom = room.isElementVideoRoom() || (elementCallVideoRoomsEnabled && room.isCallRoom());
+    const isVideoRoom = useIsVideoRoom(room, true);
 
     let iconClass: string;
     let roomType: string;
@@ -61,7 +61,7 @@ const RoomInfoLine: FC<IProps> = ({ room }) => {
     }
 
     let members: JSX.Element | undefined;
-    if (membership === "invite" && summary) {
+    if (membership === KnownMembership.Invite && summary) {
         // Don't trust local state and instead use the summary API
         members = (
             <span className="mx_RoomInfoLine_members">

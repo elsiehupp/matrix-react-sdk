@@ -75,6 +75,10 @@ export interface IConfigOptions {
         available: boolean;
         logo: string; // url
         url: string; // download url
+        url_macos?: string;
+        url_win64?: string;
+        url_win32?: string;
+        url_linux?: string;
     };
     mobile_builds: {
         ios: string | null; // download url
@@ -94,6 +98,7 @@ export interface IConfigOptions {
     integrations_ui_url?: string;
     integrations_rest_url?: string;
     integrations_widgets_urls?: string[];
+    default_widget_container_height?: number; // height in pixels
 
     show_labs_settings: boolean;
     features?: Record<string, boolean>; // <FeatureName, EnabledBool>
@@ -119,6 +124,7 @@ export interface IConfigOptions {
     };
     element_call: {
         url?: string;
+        guest_spa_url?: string;
         use_exclusively?: boolean;
         participant_limit?: number;
         brand?: string;
@@ -135,8 +141,6 @@ export interface IConfigOptions {
     report_event?: {
         admin_message_md: string; // message for how to contact the server owner when reporting an event
     };
-
-    welcome_user_id?: string;
 
     room_directory?: {
         servers: string[];
@@ -201,15 +205,24 @@ export interface IConfigOptions {
      * The issuer URL must have a trailing `/`.
      * OPTIONAL
      */
-    oidc_static_clients?: Record<
-        string,
-        {
-            client_id: string;
-        }
-    >;
+    oidc_static_clients?: {
+        [issuer: string]: { client_id: string };
+    };
+
+    /**
+     * Configuration for OIDC dynamic registration where a static OIDC client is not configured.
+     */
+    oidc_metadata?: {
+        client_uri?: string;
+        logo_uri?: string;
+        tos_uri?: string;
+        policy_uri?: string;
+        contacts?: string[];
+    };
 }
 
 export interface ISsoRedirectOptions {
     immediate?: boolean;
     on_welcome_page?: boolean;
+    on_login_page?: boolean;
 }

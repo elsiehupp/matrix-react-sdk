@@ -15,15 +15,8 @@ limitations under the License.
 */
 
 import React, { ChangeEvent, ReactNode } from "react";
-import {
-    Room,
-    RoomMember,
-    EventType,
-    RoomType,
-    IJoinRuleEventContent,
-    JoinRule,
-    MatrixError,
-} from "matrix-js-sdk/src/matrix";
+import { Room, RoomMember, EventType, RoomType, JoinRule, MatrixError } from "matrix-js-sdk/src/matrix";
+import { KnownMembership, RoomJoinRulesEventContent } from "matrix-js-sdk/src/types";
 import classNames from "classnames";
 import { RoomPreviewOpts, RoomViewLifecycle } from "@matrix-org/react-sdk-module-api/lib/lifecycles/RoomViewLifecycle";
 
@@ -192,13 +185,13 @@ export default class RoomPreviewBar extends React.Component<IProps, IState> {
         if (myMember) {
             const previousMembership = myMember.events.member?.getPrevContent().membership;
             if (myMember.isKicked()) {
-                if (previousMembership === "knock") {
+                if (previousMembership === KnownMembership.Knock) {
                     return MessageCase.RequestDenied;
                 } else if (this.props.promptAskToJoin) {
                     return MessageCase.PromptAskToJoin;
                 }
                 return MessageCase.Kicked;
-            } else if (myMember.membership === "ban") {
+            } else if (myMember.membership === KnownMembership.Ban) {
                 return MessageCase.Banned;
             }
         }
@@ -256,7 +249,7 @@ export default class RoomPreviewBar extends React.Component<IProps, IState> {
         return (
             this.props.room?.currentState
                 .getStateEvents(EventType.RoomJoinRules, "")
-                ?.getContent<IJoinRuleEventContent>().join_rule ?? null
+                ?.getContent<RoomJoinRulesEventContent>().join_rule ?? null
         );
     }
 
@@ -284,7 +277,7 @@ export default class RoomPreviewBar extends React.Component<IProps, IState> {
             return false;
         }
         const memberContent = myMember.events.member?.getContent();
-        return memberContent?.membership === "invite" && memberContent.is_direct;
+        return memberContent?.membership === KnownMembership.Invite && memberContent.is_direct;
     }
 
     private makeScreenAfterLogin(): { screen: string; params: Record<string, any> } {
@@ -513,33 +506,39 @@ export default class RoomPreviewBar extends React.Component<IProps, IState> {
                 break;
             }
             case MessageCase.Invite: {
+                const isDM = this.isDMInvite();
                 const avatar = <RoomAvatar room={this.props.room} oobData={this.props.oobData} />;
 
                 const inviteMember = this.getInviteMember();
-                let inviterElement: JSX.Element;
-                if (inviteMember) {
-                    inviterElement = (
-                        <span>
-                            <span className="mx_RoomPreviewBar_inviter">{inviteMember.rawDisplayName}</span> (
-                            {inviteMember.userId})
-                        </span>
-                    );
-                } else {
-                    inviterElement = <span className="mx_RoomPreviewBar_inviter">{this.props.inviterName}</span>;
-                }
+                const userName = (
+                    <span className="mx_RoomPreviewBar_inviter">
+                        {inviteMember?.rawDisplayName ?? this.props.inviterName}
+                    </span>
+                );
+                const inviterElement = (
+                    <>
+                        {isDM
+                            ? _t("room|dm_invite_subtitle", {}, { userName })
+                            : _t("room|invite_subtitle", {}, { userName })}
+                        {inviteMember && (
+                            <>
+                                <br />
+                                <span className="mx_RoomPreviewBar_inviter_mxid">{inviteMember.userId}</span>
+                            </>
+                        )}
+                    </>
+                );
 
-                const isDM = this.isDMInvite();
                 if (isDM) {
                     title = _t("room|dm_invite_title", {
                         user: inviteMember?.name ?? this.props.inviterName,
                     });
-                    subTitle = [avatar, _t("room|dm_invite_subtitle", {}, { userName: () => inviterElement })];
                     primaryActionLabel = _t("room|dm_invite_action");
                 } else {
                     title = _t("room|invite_title", { roomName });
-                    subTitle = [avatar, _t("room|invite_subtitle", {}, { userName: () => inviterElement })];
                     primaryActionLabel = _t("action|accept");
                 }
+                subTitle = [avatar, inviterElement];
 
                 const myUserId = MatrixClientPeg.safeGet().getSafeUserId();
                 const member = this.props.room?.currentState.getMember(myUserId);

@@ -15,9 +15,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { useCallback, useEffect, useState } from "react";
 import { base32 } from "rfc4648";
 import { IWidget, IWidgetData } from "matrix-widget-api";
 import { Room, ClientEvent, MatrixClient, RoomStateEvent, MatrixEvent } from "matrix-js-sdk/src/matrix";
+import { KnownMembership } from "matrix-js-sdk/src/types";
 import { logger } from "matrix-js-sdk/src/logger";
 import { CallType } from "matrix-js-sdk/src/webrtc/call";
 import { randomString, randomLowercaseString, randomUppercaseString } from "matrix-js-sdk/src/randomstring";
@@ -31,8 +33,10 @@ import { WidgetType } from "../widgets/WidgetType";
 import { Jitsi } from "../widgets/Jitsi";
 import { objectClone } from "./objects";
 import { _t } from "../languageHandler";
-import { IApp, isAppWidget } from "../stores/WidgetStore";
+import WidgetStore, { IApp, isAppWidget } from "../stores/WidgetStore";
 import { parseUrl } from "./UrlUtils";
+import { useEventEmitter } from "../hooks/useEventEmitter";
+import { WidgetLayoutStore } from "../stores/widgets/WidgetLayoutStore";
 
 // How long we wait for the state event echo to come back from the server
 // before waitFor[Room/User]Widget rejects its promise
@@ -83,7 +87,7 @@ export default class WidgetUtils {
             return false;
         }
 
-        if (room.getMyMembership() !== "join") {
+        if (room.getMyMembership() !== KnownMembership.Join) {
             logger.warn(`User ${me} is not in room ${roomId}`);
             return false;
         }
@@ -520,7 +524,7 @@ export default class WidgetUtils {
             // safe to send.
             // We'll end up using a local render URL when we see a Jitsi widget anyways, so this is
             // really just for backwards compatibility and to appease the spec.
-            baseUrl = "https://app.element.io/";
+            baseUrl = PlatformPeg.get()!.baseUrl;
         }
         const url = new URL("jitsi.html#" + queryString, baseUrl); // this strips hash fragment from baseUrl
         return url.href;
@@ -561,3 +565,22 @@ export default class WidgetUtils {
         return false;
     }
 }
+
+/**
+ * Hook to get the widgets for a room and update when they change
+ * @param room the room to get widgets for
+ */
+export const useWidgets = (room: Room): IApp[] => {
+    const [apps, setApps] = useState<IApp[]>(() => WidgetStore.instance.getApps(room.roomId));
+
+    const updateApps = useCallback(() => {
+        // Copy the array so that we always trigger a re-render, as some updates mutate the array of apps/settings
+        setApps([...WidgetStore.instance.getApps(room.roomId)]);
+    }, [room]);
+
+    useEffect(updateApps, [room, updateApps]);
+    useEventEmitter(WidgetStore.instance, room.roomId, updateApps);
+    useEventEmitter(WidgetLayoutStore.instance, WidgetLayoutStore.emissionForRoom(room), updateApps);
+
+    return apps;
+};
